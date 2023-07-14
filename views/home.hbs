@@ -1,0 +1,29 @@
+    <div id="bd-top-menu">
+        TOP MENU
+    </div>
+    <div id="bd-left-menu">
+        <div id="dval-menu" class="bc-left-sub-m">
+            <div id="dval-s" class="bc-dval-t">Display Values</div>
+            <div class="bc-dval-opt bc-dval-opt-sel">BTC Accumulated</div>
+            <div class="bc-dval-opt bc-dval-opt-x">BTC Value</div>
+            <div class="bc-dval-opt bc-dval-opt-x">USD Accumulated</div>
+            <div class="bc-dval-opt bc-dval-opt-x">USD Value</div>
+        </div>
+        <div id="anim-menu" class="bc-left-sub-m">
+            <div id="anim-play">Play Animation</div>
+            <input id="anim-slider" type="range" min="1" max="100" value="0">
+        </div>
+    </div>
+    <div id="bd-main" class="bc-content">
+        <canvas id="renderCanvas" touch-action="none"></canvas>
+	    <script>
+            const canvas = document.getElementById("renderCanvas"); // Get the canvas element
+            const engine = new BABYLON.Engine(canvas, true); // Generate the BABYLON 3D engine
+
+            // :: Begin :: Run Application
+            initScene(engine, canvas);
+            prepareData();
+            setupAnimationEvents();
+            // :: End :: Run Application
+        </script>
+    </div>
