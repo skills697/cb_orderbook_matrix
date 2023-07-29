@@ -1,12 +1,13 @@
 // Import necessary package
 const CoinbasePro = require('coinbase-pro');
+const Request = require('request');
 
 // Set up Coinbase Pro API client
 const apiURI = 'https://api.pro.coinbase.com';
 const publicClient = new CoinbasePro.PublicClient(apiURI);
 
-// Define the product (asset) you want to get the order book for
-const product = 'BTC-USD';
+// Define the product (asset) you want to get the order book for (default: BTC-USD)
+let product = 'BTC-USD';
 
 // Function to group orders based on a price range and sum their sizes
 function groupOrders(buyOrders, sellOrders) {  
@@ -49,7 +50,9 @@ function groupOrders(buyOrders, sellOrders) {
 };
 
 // Fetch buy and sell orders from the exchange and group them
-function getOrderBook() {
+function getOrderBook(tradePair) {
+  if(tradePair) product = tradePair;
+
   return new Promise((resolve, reject) => {
     publicClient.getProductOrderBook(product, { level: 2 }, (error, response, data) => {
       if (error) {
@@ -66,6 +69,40 @@ function getOrderBook() {
   });
 };
 
+//Fetch price history on trading pair
+function getCandles(tradePair, duration) {
+  duration = duration || 3600;
+  const args = {
+    "start":       Math.floor(Date.now() / 1000) - duration, 
+    "end":         Math.floor(Date.now() / 1000), 
+    "granularity": 300
+  };
+  if(tradePair) product = tradePair;
+
+  return new Promise((resolve, reject) => {
+    publicClient.getProductHistoricRates(product, args, (error, response, data) => {
+      if (error) {
+        reject(error);
+        return;
+      }
+      let res = [];
+      data.forEach((val) => {
+        res.push({
+          "start": val[0],
+          "low": val[1],
+          "high": val[2],
+          "open": val[3],
+          "close": val[4],
+          "volume": val[5]
+        });
+      });
+      console.log("Price Data Found!");
+      resolve(res);
+    });
+  });
+}
+
 module.exports = {
   getOrderBook,
+  getCandles,
 };

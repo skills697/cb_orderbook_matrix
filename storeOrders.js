@@ -1,5 +1,5 @@
 const pool = require('./db');
-const { getOrderBook } = require('./getOrders');
+const { getOrderBook, getCandles } = require('./getOrders');
 
 // Function to create the necessary tables if they don't exist
 async function createTables() {
@@ -7,6 +7,7 @@ async function createTables() {
     CREATE TABLE IF NOT EXISTS snapshot (
       id SERIAL PRIMARY KEY,
       trading_pair VARCHAR(12) NOT NULL,
+      price_last NUMERIC NOT NULL,
       timestamp TIMESTAMP NOT NULL DEFAULT NOW()
     );
   `);
@@ -28,10 +29,12 @@ async function storeOrders(tradingPair) {
   try {
     await createTables();
 
+    // Fetch coinbase exchange data to be stored
     const { buyOrderGroups, sellOrderGroups } = await getOrderBook(tradingPair);
+    const currentPrice = await getCurrentPrice(tradingPair);
 
     // Insert a new snapshot and get the snapshot ID
-    const snapshotResult = await pool.query('INSERT INTO snapshot (trading_pair) VALUES ($1) RETURNING id', [tradingPair]);
+    const snapshotResult = await pool.query('INSERT INTO snapshot (trading_pair, price_last) VALUES ($1, $2) RETURNING id', [tradingPair, currentPrice.close]);
     const snapshotId = snapshotResult.rows[0].id;
 
     // Insert buy orders
@@ -58,4 +61,17 @@ async function storeOrders(tradingPair) {
   }
 }
 
+//Function to retrieve last candle on a given trade pair
+async function getCurrentPrice(tradingPair) {
+  try {
+    const data = await getCandles(tradingPair);
+    return data[0];
+
+  } catch (error) {
+    console.error('Error getting price data:', error);
+  }
+}
+
 storeOrders('BTC-USD');
+
+
