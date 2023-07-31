@@ -1,3 +1,10 @@
+/*
+* Module: getOrders.js
+* Author: Patrick Howe
+* Description: This module supports API requests from the application to the coinbase API for 
+*              retrieving orderbook data.
+*/
+
 // Import necessary package
 const CoinbasePro = require('coinbase-pro');
 const Request = require('request');
@@ -100,7 +107,7 @@ function getCandles(tradePair, duration) {
       resolve(res);
     });
   });
-}
+};
 
 module.exports = {
   getOrderBook,
