@@ -1,52 +1,77 @@
 const express = require('express');
-const exphbs = require('express-handlebars');
-const pool = require('./db');
 const homeRouter = require('./routes/homeRouter');
+
+const {getSnapshots, getLatestSnapshot} = require("./models/snapshots");
+const {getOrdersBySnapshotId} = require("./models/orders");
 
 const app = express();
 const port = 3000;
-
-// Configure Handlebars as the template engine
-app.engine('hbs', exphbs({ extname: '.hbs' }));
-app.set('view engine', 'hbs');
 
 // Serve static files from the /public directory
 app.use(express.static('public'));
 
 // Load and set up the home route
-app.use('/', homeRouter);
+//app.use('/', homeRouter);
 
 app.use(express.json());
 
-// API endpoint to fetch snapshots and their orders for a given trading pair and date range
+// API endpoint to fetch snapshots
 app.get('/snapshots', async (req, res) => {
   try {
-    const tradingPair = req.query.tradingPair;
-    const startDate = req.query.startDate;
-    const endDate = req.query.endDate || 'infinity';
+    //const tradingPair = req.query.tradingPair || 'BTC-USD';
+    const start = req.query.startTime;
+    const end = req.query.endTime || 2147483647;
 
-    if (!tradingPair || !startDate) {
-      return res.status(400).send({ error: 'Please provide a tradingPair and startDate query parameters' });
+    if (!start) {
+      return res.status(400).send({ error: 'Please provide a valid unix timestamp value for startTime and endTime'});
     }
 
-    // Fetch snapshots for the given trading pair and date range
-    const snapshotResult = await pool.query(
-      `SELECT * FROM snapshot
-       WHERE trading_pair = $1
-       AND timestamp BETWEEN $2 AND $3
-       ORDER BY timestamp`,
-      [tradingPair, startDate, endDate]
-    );
-
-    const snapshots = snapshotResult.rows;
-
-    // Fetch orders for each snapshot
-    for (const snapshot of snapshots) {
-      const ordersResult = await pool.query('SELECT * FROM orders WHERE snapshot_id = $1', [snapshot.id]);
-      snapshot.orders = ordersResult.rows;
+    const dataout = getSnapshots(start, end);
+    if(dataout.length <= 0){
+      return res.status(400).send({ error: 'No snapshots found'});
     }
 
-    res.json({ snapshots });
+    res.json(dataout);
+
+  } catch (error) {
+    console.error('Error fetching snapshots:', error);
+    res.status(500).send({ error: 'Error fetching snapshots' });
+  }
+});
+
+// API endpoint to fetch latest snapshot
+app.get('/snapshots/latest', async (req, res) => {
+  try {
+
+    const dataout = getLatestSnapshot();
+    if(dataout.length <= 0){
+      return res.status(400).send({ error: 'No snapshots found'});
+    }
+
+    res.json(dataout);
+
+  } catch (error) {
+    console.error('Error fetching snapshots:', error);
+    res.status(500).send({ error: 'Error fetching snapshots' });
+  }
+});
+
+// API endpoint to fetch orders for a given snapshot
+app.get('/orders', async (req, res) => {
+  try {
+    const snapshot = req.query.snapshotId;
+
+    if (!snapshot) {
+      return res.status(400).send({ error: 'Please provide a valid snapshotId'});
+    }
+
+    const orders = getOrdersBySnapshotId(snapshot);
+    if(dataout.length <= 0){
+      return res.status(400).send({ error: 'No orders found'});
+    }
+
+    res.json({ orders });
+
   } catch (error) {
     console.error('Error fetching snapshots:', error);
     res.status(500).send({ error: 'Error fetching snapshots' });

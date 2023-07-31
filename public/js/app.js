@@ -318,8 +318,8 @@ const getRowGeometry = function(row_index, ind_buy){
     const optAdd = (mainUI.layers.selected == 0 || mainUI.layers.selected == 2) ? true : false;
     const optUsd = (mainUI.layers.selected == 2 || mainUI.layers.selected == 3) ? true : false;
 
-    var resPath = [];
-    var p1_y = 0;
+    let resPath = [];
+    let p1_y = 0;
     for(var i=0; i < priceMap.length; i++){
         resPath.push(new BABYLON.Vector3(
             ((priceMap[i][0] / mapData.maxBuy) * CENV.MAP_RESOLUTION) + (ind_buy ? 0.5 : -0.5),
