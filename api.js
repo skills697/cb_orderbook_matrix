@@ -2,7 +2,7 @@ const express = require('express');
 const homeRouter = require('./routes/homeRouter');
 
 const {getSnapshots, getLatestSnapshot} = require("./models/snapshots");
-const {getOrdersBySnapshotId} = require("./models/orders");
+const {getOrdersBySnapshotId, getOrdersByUnixTimestamp} = require("./models/orders");
 
 const app = express();
 const port = 3000;
@@ -26,12 +26,12 @@ app.get('/snapshots', async (req, res) => {
       return res.status(400).send({ error: 'Please provide a valid unix timestamp value for startTime and endTime'});
     }
 
-    const dataout = getSnapshots(start, end);
+    const dataout = await getSnapshots(start, end);
     if(dataout.length <= 0){
       return res.status(400).send({ error: 'No snapshots found'});
     }
 
-    res.json(dataout);
+    res.send(dataout);
 
   } catch (error) {
     console.error('Error fetching snapshots:', error);
@@ -43,12 +43,12 @@ app.get('/snapshots', async (req, res) => {
 app.get('/snapshots/latest', async (req, res) => {
   try {
 
-    const dataout = getLatestSnapshot();
+    const dataout = await getLatestSnapshot();
     if(dataout.length <= 0){
       return res.status(400).send({ error: 'No snapshots found'});
     }
 
-    res.json(dataout);
+    res.send(dataout);
 
   } catch (error) {
     console.error('Error fetching snapshots:', error);
@@ -60,17 +60,23 @@ app.get('/snapshots/latest', async (req, res) => {
 app.get('/orders', async (req, res) => {
   try {
     const snapshot = req.query.snapshotId;
+    const snapStart = req.query.startTime;
+    const snapEnd = req.query.endTime;
+    let orders;
 
-    if (!snapshot) {
-      return res.status(400).send({ error: 'Please provide a valid snapshotId'});
+    if (!snapshot && (!snapStart || !snapEnd)) {
+      return res.status(400).send({ error: 'Please select orders by providing a valid snapshotId or start & end time.'});
+    } else if(!snapshot){
+      orders = getOrdersByUnixTimestamp(snapStart, snapEnd);
+    } else {
+      orders = getOrdersBySnapshotId(snapshot);
     }
 
-    const orders = getOrdersBySnapshotId(snapshot);
-    if(dataout.length <= 0){
+    if(orders.length <= 0){
       return res.status(400).send({ error: 'No orders found'});
     }
 
-    res.json({ orders });
+    res.send(orders);
 
   } catch (error) {
     console.error('Error fetching snapshots:', error);

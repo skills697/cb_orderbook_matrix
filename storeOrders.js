@@ -13,7 +13,7 @@ let initTableSetup = false;
 async function createTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS snapshot (
-      id SERIAL PRIMARY KEY,
+      snapshot_id SERIAL PRIMARY KEY,
       trading_pair VARCHAR(12) NOT NULL,
       unix_ts_start INTEGER NOT NULL,
       price_low NUMERIC NOT NULL,
@@ -28,7 +28,7 @@ async function createTables() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS orders (
       id SERIAL PRIMARY KEY,
-      snapshot_id INTEGER REFERENCES snapshot(id) ON DELETE CASCADE,
+      snapshot_id INTEGER REFERENCES snapshot(snapshot_id) ON DELETE CASCADE,
       side VARCHAR(4) NOT NULL,
       min_price NUMERIC NOT NULL,
       max_price NUMERIC NOT NULL,
@@ -45,7 +45,7 @@ async function storeSnapshot(tradingPair, start, low, high, open, close, volume)
     // Insert a new snapshot and get the snapshot ID
     const snapshotResult = await pool.query(
       'INSERT INTO snapshot (trading_pair, unix_ts_start, price_low, price_high, price_open, price_close, volume)' +
-      ' VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id',
+      ' VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING snapshot_id',
      [tradingPair, start, low, high, open, close, volume]);
     return snapshotResult.rows[0].id;
 };

@@ -39,7 +39,9 @@ var mapData = {
     maxBuy: 0,
     buys: [],
     sells: [],
-}
+    snapshots: [],
+    candles: [],
+};
 
 /**
 * Function: prepareData()
@@ -47,11 +49,21 @@ var mapData = {
 */
 const prepareData = async () => {
     console.log("Preparing Data");
-    const response = await fetch('/api/orderbook');
-    const data = await response.json();
-    mapData.maxBuy = data.maxBuy;
-    mapData.buys = data.buys;
-    mapData.sells = data.sells;
+    const res1 = await fetch('/snapshots/latest');
+    const latest = await res1.json();
+    console.log("Latest Found!");
+    console.log(latest);
+    // mapData.maxBuy = data.maxBuy;
+    // mapData.buys = data.buys;
+    // mapData.sells = data.sells;
+
+    const endTime = latest[0].unix_ts_start - 300;
+    const startTime = latest[0].unix_ts_start - (300 * 51);
+    const res2 = await fetch('/snapshots?startTime=' + startTime + "&endTime=" + endTime);
+    mapData.snapshots = await res2.json();
+
+    console.log("Snapshots Found!");
+    console.log(mapData.snapshots);
 
     console.log("Creating Scene");
     createScene();

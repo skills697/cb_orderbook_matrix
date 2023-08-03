@@ -10,4 +10,16 @@ async function getOrdersBySnapshotId(snapshotId) {
   }
 }
 
+
+async function getOrdersByUnixTimestamp(start, end) {
+  try {
+    const query = 'SELECT * FROM orders WHERE snapshot_id IN (select snapshot_id from snapshot where unix_ts_start between $1 and $2)';
+    const result = await db.query(query, [start, end]);
+    return result.rows;
+  } catch (error) {
+    throw error;
+  }
+}
+
+
 module.exports = { getOrdersBySnapshotId };
