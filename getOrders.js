@@ -76,15 +76,23 @@ function getOrderBook(tradePair) {
   });
 };
 
-//Fetch price history on trading pair
-function getCandles(tradePair, duration) {
+//Fetch current price history on trading pair
+function getCurrentCandles(tradePair, duration) {
   duration = duration || 3600;
+  const start = Math.floor(Date.now() / 1000) - duration;
+  const end = Math.floor(Date.now() / 1000);
+  const granularity = 300;
+  return getCandles(tradePair, start, end, granularity);
+};
+
+//Fetch price history on trading pair
+function getCandles(start, end, tradePair, granularity) {
   const args = {
-    "start":       Math.floor(Date.now() / 1000) - duration, 
-    "end":         Math.floor(Date.now() / 1000), 
-    "granularity": 300
+    "start":       start,
+    "end":         end,
+    "granularity": (granularity || 300)
   };
-  if(tradePair) product = tradePair;
+  product = tradePair||'BTC-USD';
 
   return new Promise((resolve, reject) => {
     publicClient.getProductHistoricRates(product, args, (error, response, data) => {
@@ -111,5 +119,6 @@ function getCandles(tradePair, duration) {
 
 module.exports = {
   getOrderBook,
+  getCurrentCandles,
   getCandles,
 };

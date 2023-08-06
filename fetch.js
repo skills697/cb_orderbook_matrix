@@ -5,7 +5,7 @@
 */
 
 const { storeOrders, storeSnapshot } = require("./storeOrders");
-const { getOrderBook, getCandles } = require('./getOrders');
+const { getOrderBook, getCurrentCandles, getCandles } = require('./getOrders');
 
 function sleep(sec) {
     console.log("\n************************************************************************************************");
@@ -29,7 +29,7 @@ const run = async function runScript(tradingPair) {
             //check for new candles, if no new set of candles found, sleep 1 second.
             while(curr.start == lastStart){
                 await sleep(1);
-                curr = (await getCandles(tradingPair, 600))[0];
+                curr = (await getCurrentCandles(tradingPair, 600))[0];
             }
     
             // Insert a new snapshot and get the snapshot ID

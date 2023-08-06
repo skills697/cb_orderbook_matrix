@@ -5,7 +5,8 @@ const CENV = {
     MAP_DEPTH: 40,
     DISPLAY_DEPTH: 10,
     MESH_ALPHA: 0.3,
-    LINE_ALHPA: 0.7
+    LINE_ALHPA: 0.7,
+    TIME_GRANULARITY: 300,
 }
 
 // global variables
@@ -37,10 +38,9 @@ var anim = {
 
 var mapData = {
     maxBuy: 0,
-    buys: [],
-    sells: [],
-    snapshots: [],
-    candles: [],
+    startTime: 0,
+    endTime: 0,
+    snapshots: {},
 };
 
 /**
@@ -49,24 +49,75 @@ var mapData = {
 */
 const prepareData = async () => {
     console.log("Preparing Data");
-    const res1 = await fetch('/snapshots/latest');
-    const latest = await res1.json();
-    console.log("Latest Found!");
-    console.log(latest);
-    // mapData.maxBuy = data.maxBuy;
-    // mapData.buys = data.buys;
-    // mapData.sells = data.sells;
+    try {
+        //Latest Snapshot
+        const res1 = await fetch('/snapshots/latest');
+        const latest = await res1.json();
+        console.log("Latest Found!");
+        console.log(latest);
+    
+        //Snapshots
+        mapData.endTime = latest[0].unix_ts_start - 300;
+        mapData.startTime = latest[0].unix_ts_start - (300 * 51);
+        const res2 = await fetch('/snapshots?startTime=' + mapData.startTime + "&endTime=" + mapData.endTime);
+        const res_snaps = await res2.json();
+        if(!mapData.snapshots) {
+            mapData.snapshots = {};
+        }
+        if(res_snaps.length > 0){
+            res_snaps.forEach((val) => {
+                mapData.snapshots[val.unix_ts_start] = {
+                    id: val.unix_ts_start,
+                    data: val
+                };
+            });
+        }
+        console.log("Snapshots Found!");
 
-    const endTime = latest[0].unix_ts_start - 300;
-    const startTime = latest[0].unix_ts_start - (300 * 51);
-    const res2 = await fetch('/snapshots?startTime=' + startTime + "&endTime=" + endTime);
-    mapData.snapshots = await res2.json();
-
-    console.log("Snapshots Found!");
-    console.log(mapData.snapshots);
-
-    console.log("Creating Scene");
-    createScene();
+        //Orders
+        const res3 = await fetch('/orders?startTime=' + mapData.startTime + "&endTime=" + mapData.endTime);
+        const order_snaps = await res3.json();
+        for (const order_id in order_snaps) {
+            if(!(order_snaps[order_id].snapshot in mapData.snapshots)) {
+                throw new Error("Order found for a missing snapshot: " + order_snaps[order_id].snapshot);
+            }
+            if(!("orders" in mapData.snapshots[order_snaps[order_id].snapshot])) {
+                mapData.snapshots[order_snaps[order_id].snapshot].orders = {
+                    buys: [],
+                    sells: []
+                }
+            }
+            order_snaps[order_id].orders.forEach((n_order) => {
+                if(n_order.side == 'buy') {
+                    mapData.snapshots[order_snaps[order_id].snapshot].orders.buys.push(n_order);
+                } else {
+                    mapData.snapshots[order_snaps[order_id].snapshot].orders.sells.unshift(n_order);
+                }
+            });
+        };
+        console.log("Orders Found!");
+        
+        //Candles
+        const res4 = await fetch('/candles?startTime=' + mapData.startTime + "&endTime=" + mapData.endTime);
+        const cand = await res4.json();
+        cand.forEach((val) => {
+            if(!(val.start in mapData.snapshots)) {
+                mapData.snapshots[val.start] = { id: val.start, candle: val };
+            } else {
+                mapData.snapshots[val.start].candle = val;
+            }
+            if(mapData.maxBuy < val.high){
+                mapData.maxBuy = val.high;
+            } 
+        });
+        console.log("Candles Found!");
+    
+        console.log("Creating Scene");
+        createScene();
+        
+    } catch(error) {
+        console.error("Error:", error);
+    }
 }
 
 
@@ -78,7 +129,6 @@ const prepareData = async () => {
 */
 const initScene = function (main_engine, main_canvas) {
     console.log("Initializing Scene");
-    var rFrame = 0;
     main3D.engine = main_engine;
     mainScene = new BABYLON.Scene(main3D.engine);
 
@@ -139,6 +189,7 @@ const renderScene = function () {
 * Generate the scene for our data to be rendered
 */
 const createScene = function () {
+    //Initialize Meshes for selected layer
     createLayer(mainUI.layers.selected);
 
     mainUI.hoverLight = new BABYLON.PointLight("light", new BABYLON.Vector3(0, 0, 0), mainScene);
@@ -157,14 +208,14 @@ const createScene = function () {
     mainScene.onPointerDown = (event, pickResult) => {
         if(event.button == 0){
             if(mainUI.lineSelect >= 0) {
-                mainUI.highlightLayer.removeMesh(main3D.meshes[mainUI.layers.selected].asks[mainUI.lineSelect][1]);
-                mainUI.highlightLayer.removeMesh(main3D.meshes[mainUI.layers.selected].bids[mainUI.lineSelect][1]);
+                mainUI.highlightLayer.removeMesh(main3D.meshes[mainUI.layers.selected].buys[mainUI.lineSelect][1]);
+                mainUI.highlightLayer.removeMesh(main3D.meshes[mainUI.layers.selected].sells[mainUI.lineSelect][1]);
             }
 
             if(mainUI.isMeshHover) {
                 let line_num = Math.round((pickResult.pickedPoint.z - anim.transformZ.position.z - 10.0)/10.0);
-                mainUI.highlightLayer.addMesh(main3D.meshes[mainUI.layers.selected].asks[line_num][1], BABYLON.Color3.Red());
-                mainUI.highlightLayer.addMesh(main3D.meshes[mainUI.layers.selected].bids[line_num][1], BABYLON.Color3.Red());
+                mainUI.highlightLayer.addMesh(main3D.meshes[mainUI.layers.selected].buys[line_num][1], BABYLON.Color3.Red());
+                mainUI.highlightLayer.addMesh(main3D.meshes[mainUI.layers.selected].sells[line_num][1], BABYLON.Color3.Red());
                 mainUI.lineSelect = line_num;
             }
         }
@@ -179,25 +230,29 @@ const createScene = function () {
 const createLayer = function(layer_index) {
     // TransformZ[row] -> TransformY -> Mesh
     main3D.meshes[layer_index] = {};
-    main3D.meshes[layer_index].transformY = new BABYLON.TransformNode("transY" + hselect);
+    main3D.meshes[layer_index].transformY = new BABYLON.TransformNode("transY" + layer_index);
     main3D.meshes[layer_index].transformY.parent = anim.transformZ;
     main3D.meshes[layer_index].buys = [];
     main3D.meshes[layer_index].sells = [];
 
-    for(var i=0; i < mapData.buys.length; i++){
-        var bid_mesh = generateMapRow(i, true);
-        bid_mesh.mesh.parent = main3D.meshes[layer_index].transformY;
-        bid_mesh.line.parent = main3D.meshes[layer_index].transformY;
-        main3D.meshes[layer_index].buys.push([bid_mesh.mesh, bid_mesh.line]);
-    }
+    for(const snap_id in mapData.snapshots){
+        //Do not generate a new mesh if we have no order history (just a candlestick)
+        if(!mapData.snapshots[snap_id].orders) return;
 
-    for(var i=0; i < mapData.sells.length; i++){
-        var ask_mesh = generateMapRow(i, false);
-        ask_mesh.mesh.parent = main3D.meshes[layer_index].transformY;
-        ask_mesh.line.parent = main3D.meshes[layer_index].transformY;
-        main3D.meshes[layer_index].sells.push([ask_mesh.mesh, ask_mesh.line]);
-    }
-    
+        //build buy meshes
+        const buy_mesh = generateMapRow(mapData.snapshots[snap_id], true);
+        buy_mesh.mesh.parent = main3D.meshes[layer_index].transformY;
+        buy_mesh.line.parent = main3D.meshes[layer_index].transformY;
+        main3D.meshes[layer_index].buys.push([buy_mesh.mesh, buy_mesh.line]);
+
+        //build sell meshes
+        const sell_mesh = generateMapRow(mapData.snapshots[snap_id], false);
+        sell_mesh.mesh.parent = main3D.meshes[layer_index].transformY;
+        sell_mesh.line.parent = main3D.meshes[layer_index].transformY;
+        main3D.meshes[layer_index].sells.push([sell_mesh.mesh, sell_mesh.line]);
+    };
+
+    // TO-DO Set Alpha Transparency
     main3D.meshes[layer_index].buys.forEach(setAlphaTrans);
     main3D.meshes[layer_index].sells.forEach(setAlphaTrans);
 
@@ -214,11 +269,11 @@ const createLayer = function(layer_index) {
 * @param {number} layer_index - index of layer to create
 */
 const hideLayer = function(layer_index) {
-    meshes[layer_index].buys.forEach((val, index) => {
+    main3D.meshes[layer_index].buys.forEach((val, index) => {
         val[0].setEnabled(false);
         val[1].setEnabled(false);
     });
-    meshes[layer_index].sells.forEach((val, index) => {
+    main3D.meshes[layer_index].sells.forEach((val, index) => {
         val[0].setEnabled(false);
         val[1].setEnabled(false);
     });
@@ -236,11 +291,11 @@ const hideLayer = function(layer_index) {
 * @param {number} layer_index - index of layer to create
 */
 const showLayer = function(layer_index) {
-    meshes[layer_index].buys.forEach((val, index) => {
+    main3D.meshes[layer_index].buys.forEach((val) => {
         val[0].setEnabled(true);
         val[1].setEnabled(true);
     });
-    meshes[layer_index].sells.forEach((val, index) => {
+    main3D.meshes[layer_index].sells.forEach((val) => {
         val[0].setEnabled(true);
         val[1].setEnabled(true);
     });
@@ -253,24 +308,48 @@ const showLayer = function(layer_index) {
 }
 
 /**
-* Function: initMapRow(row_index, ind_buy)
+* Function: generateMapRow(row_index, ind_buy)
 * create a new row for our price map
-* @param {number} row_index - index of row to create
+* @param {Snapshot} snapshot - snapshot object for row to create
 * @param {boolean} ind_buy - indicates whether this is a buy or sell row
 * @returns {object} - object containing the row mesh and line mesh
 */
-const generateMapRow = function(row_index, ind_buy) {
-    let uniq_name =  ((ind_buy) ? "Buy" : "Sell") + row_index;
-    let next_index = (row_index+1) < (ind_buy ? mapData.buys.length : mapData.sells.length) ? (row_index+1) : row_index;
+const generateMapRow = function(snapshot, ind_buy) {
+    const order_type = (ind_buy) ? "buys" : "sells";
+    const uniq_name =  ((ind_buy) ? "Buy" : "Sell") + snapshot.id;
+
+    // Select next order to map end points to for our new mesh
+    const next_id = snapshot.id + CENV.TIME_GRANULARITY
+    let next_orders = [];
+    if(next_id in mapData.snapshots) {
+        if("orders" in mapData.snapshots[next_id]) {
+            next_orders = mapData.snapshots[next_id].orders[order_type];
+        }
+    }
+    if(next_orders.length <= 0) {
+        //no mesh found: generate a 0 trade value with same order prices
+        snapshot.orders[order_type].forEach((val) => {
+            next_orders.push({
+                id: 0,
+                max: val.max,
+                min: val.min,
+                side: val.side,
+                total: 0
+            });
+        })
+    }  
+
+    // Generate mesh
     let geometry_data = [];
-    geometry_data.push(getRowGeometry(row_index, ind_buy));
-    geometry_data.push(getRowGeometry(next_index, ind_buy));
+    const row_index = (snapshot.id - mapData.startTime) / CENV.TIME_GRANULARITY;
+    geometry_data.push(getRowGeometry(snapshot.orders[order_type], row_index, ind_buy));
+    geometry_data.push(getRowGeometry(next_orders, (row_index+1), ind_buy));
     let row = BABYLON.MeshBuilder.CreateRibbon("ribbon" + uniq_name, {
         pathArray: geometry_data, 
         closeArray: false, 
         closePath: false, 
-        //sideOrientation: (ind_buy) ? BABYLON.Mesh.FRONTSIDE : BABYLON.Mesh.BACKSIDE
-        sideOrientation: (ind_buy) ? BABYLON.Mesh.BACKSIDE : BABYLON.Mesh.FRONTSIDE
+        sideOrientation: (ind_buy) ? BABYLON.Mesh.FRONTSIDE : BABYLON.Mesh.BACKSIDE
+        //sideOrientation: (ind_buy) ? BABYLON.Mesh.BACKSIDE : BABYLON.Mesh.FRONTSIDE
     });
 
     let white_mat = new BABYLON.StandardMaterial("rowMat" + uniq_name, mainScene);
@@ -319,23 +398,24 @@ const generateMapRow = function(row_index, ind_buy) {
 }
 
 /**
-* Function:     getRowGeometry(row_index, ind_bid)
+* Function:     getRowGeometry(orders, row_index, ind_bid)
 * Generates geometry data using the price data
+* @param {Orders[]} orders - array of orders*
 * @param {number} row_index - index of row to create
 * @param {boolean} ind_buy - indicates whether this is a buy or sell row
 */
-const getRowGeometry = function(row_index, ind_buy){
-    //Set up options for price mapping data to 3D geometry
-    const priceMap = (ind_buy) ? mapData.buys[row_index] : mapData.sells[row_index];
+const getRowGeometry = function(orders, row_index, ind_buy){
     const optAdd = (mainUI.layers.selected == 0 || mainUI.layers.selected == 2) ? true : false;
     const optUsd = (mainUI.layers.selected == 2 || mainUI.layers.selected == 3) ? true : false;
 
     let resPath = [];
     let p1_y = 0;
-    for(var i=0; i < priceMap.length; i++){
+    for(var i=0; i < orders.length; i++){
+        const pr_val = (ind_buy) ? orders[i].max : orders[i].min;
+        const tr_vol = orders[i].total;
         resPath.push(new BABYLON.Vector3(
-            ((priceMap[i][0] / mapData.maxBuy) * CENV.MAP_RESOLUTION) + (ind_buy ? 0.5 : -0.5),
-            (p1_y = (optAdd ? p1_y : 0) + (priceMap[i][1] * (optUsd ? priceMap[i][0]*0.0001 : 1) / 200)),
+            ((pr_val / mapData.maxBuy) * CENV.MAP_RESOLUTION) + (ind_buy ? -0.5 : 0.5),
+            (p1_y = (optAdd ? p1_y : 0) + (tr_vol * ( optUsd ? (pr_val*0.0001) : 1 ) / 200)),
             (row_index * CENV.FRAME_RATE) + CENV.FRAME_RATE));
     }
 
@@ -372,7 +452,10 @@ const setupAnimationEvents = function() {
     });
 
     // selection changes to geometry data
-    mainUI.dval = { items: document.getElementsByClassName("bc-dval-opt") };
+    mainUI.layers = { 
+        items: document.getElementsByClassName("bc-dval-opt"), 
+        selected: 0 
+    };
     selectGeometryEvent();
 
     mainScene.setRenderingAutoClearDepthStencil(1, false, false);
@@ -402,8 +485,8 @@ const setAlphaTrans = function(alpha_val, index) {
         // z is positive - fade alpha in 
         alphaOut = (10.0 - (rp - beginZ)) / 10.0;
 
-    v[0].material.alpha = ((alphaOut < 0.0) ? 0.0 : alphaOut) * CENV.MESH_ALPHA;
-    v[1].alpha = ((alphaOut < 0.0) ? 0.0 : alphaOut) * CENV.LINE_ALHPA;
+    alpha_val[0].material.alpha = ((alphaOut < 0.0) ? 0.0 : alphaOut) * CENV.MESH_ALPHA;
+    alpha_val[1].alpha = ((alphaOut < 0.0) ? 0.0 : alphaOut) * CENV.LINE_ALHPA;
 }
 
 /**
@@ -413,13 +496,15 @@ const setAlphaTrans = function(alpha_val, index) {
 const selectGeometryEvent = function() {
     if (mainUI.layers.items) {
         for (var i = 0; i < mainUI.layers.items.length; i++) {
-            let vit = mainUI.layers.items.item(i);
-            vit.setAttribute("selectval", i);
-            if (vit.classList.contains("bc-dval-opt-sel"))
+            const item = mainUI.layers.items.item(i);
+            item.setAttribute("selectval", i);
+            if (item.classList.contains("bc-dval-opt-sel")){
                 mainUI.layers.selected = i;
-            vit.onclick = (event) => {
+            }
+            item.onclick = (event) => {
+                console.log("layer select event");
                 if (mainUI.layers.selected != event.target.getAttribute("selectval")) {
-                    let prev_item = mainUI.layers.items.item(mainUI.dval.selected);
+                    let prev_item = mainUI.layers.items.item(mainUI.layers.selected);
                     prev_item.classList.remove("bc-dval-opt-sel");
                     prev_item.classList.add("bc-dval-opt-x");
                     event.target.classList.add("bc-dval-opt-sel");
@@ -427,14 +512,14 @@ const selectGeometryEvent = function() {
                     hideLayer(mainUI.layers.selected);
 
                     mainUI.layers.selected = event.target.getAttribute("selectval");
-                    if (meshes[mainUI.layers.selected])
+                    if (main3D.meshes[mainUI.layers.selected])
                         showLayer(mainUI.layers.selected);
 
                     else
                         createLayer(mainUI.layers.selected);
 
-                    meshes[mainUI.layers.selected].buys.forEach(setAlphaTrans);
-                    meshes[mainUI.layers.selected].sells.forEach(setAlphaTrans);
+                    main3D.meshes[mainUI.layers.selected].buys.forEach(setAlphaTrans);
+                    main3D.meshes[mainUI.layers.selected].sells.forEach(setAlphaTrans);
                 }
             };
         }
