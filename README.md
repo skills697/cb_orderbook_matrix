@@ -1,6 +1,7 @@
 # cb_orderbook_matrix
 
-![Screenshot 2023-08-06 004613](https://github.com/skills697/cb_orderbook_matrix/assets/2799001/dac414ef-c531-41f0-866d-e3a3f91a351a)
+![Screenshot 2023-08-07 190829](https://github.com/skills697/cb_orderbook_matrix/assets/2799001/3234b4f4-2dff-4ec2-b6f7-b2b6cb7a9e08)
+
 
 Javascript web application for mapping a 3D geometry of Coinbase's orderbook data. Complete with animation to show changes to the orderbook mapped to time and candles.
 
