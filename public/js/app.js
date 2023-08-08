@@ -2,10 +2,9 @@
 const CENV = {
     FRAME_RATE: 10,
     MAP_RESOLUTION: 100,
-    MAP_DEPTH: 40,
     DISPLAY_DEPTH: 10,
     MESH_ALPHA: 0.3,
-    LINE_ALHPA: 0.7,
+    LINE_ALPHA: 0.7,
     TIME_GRANULARITY: 300,
 }
 
@@ -29,6 +28,12 @@ var main3D = {
     selectUI: null,
     meshes: [],
     isMeshHover: false,
+    floor: {
+        lines: {
+            prices: [],
+            frames: [],
+        },
+    },
 }
 
 var anim = {
@@ -41,6 +46,7 @@ var mapData = {
     startTime: 0,
     endTime: 0,
     snapshots: {},
+    snapsTotal: 0,
 };
 
 /**
@@ -61,9 +67,6 @@ const prepareData = async () => {
         mapData.startTime = latest[0].unix_ts_start - (300 * 51);
         const res2 = await fetch('/snapshots?startTime=' + mapData.startTime + "&endTime=" + mapData.endTime);
         const res_snaps = await res2.json();
-        if(!mapData.snapshots) {
-            mapData.snapshots = {};
-        }
         if(res_snaps.length > 0){
             res_snaps.forEach((val) => {
                 mapData.snapshots[val.unix_ts_start] = {
@@ -111,6 +114,11 @@ const prepareData = async () => {
             } 
         });
         console.log("Candles Found!");
+
+        mapData.snapsTotal = Object.keys(mapData.snapshots).length;
+        if(mainUI.playSlider){
+            mainUI.playSlider.max = (mapData.snapsTotal) ? (mapData.snapsTotal * CENV.FRAME_RATE) : 1;
+        }
     
         console.log("Creating Scene");
         createScene();
@@ -135,7 +143,7 @@ const initScene = function (main_engine, main_canvas) {
     main3D.texture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("GUI", true, mainScene);    
     mainCamera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(0.5 * CENV.MAP_RESOLUTION, 30, 0), mainScene);
     mainCamera.inputs.addMouseWheel();
-    mainCamera.setTarget(new BABYLON.Vector3(0.5 * CENV.MAP_RESOLUTION, 25, CENV.MAP_DEPTH * CENV.FRAME_RATE));
+    mainCamera.setTarget(new BABYLON.Vector3(0.5 * CENV.MAP_RESOLUTION, 25, CENV.DISPLAY_DEPTH * CENV.FRAME_RATE));
     mainCamera.attachControl(main_canvas, true);
 
     var hlight1 = new BABYLON.HemisphericLight("HemisphericLight1", new BABYLON.Vector3(1, 1, 0));
@@ -178,9 +186,8 @@ const renderScene = function () {
 
     if(anim.playing){
         anim.transformZ.position.z -= 0.1;
-        main3D.meshes[mainUI.layers.selected].buys.forEach(setAlphaTrans);
-        main3D.meshes[mainUI.layers.selected].sells.forEach(setAlphaTrans);
         mainUI.playSlider.value = 0 - anim.transformZ.position.z;
+        updateAlphaTrans();
     }
 }
 
@@ -198,6 +205,8 @@ const createScene = function () {
     mainUI.hoverLight.range = 5;
     mainUI.hoverLight.setEnabled(false);
     
+    initFloor();
+    updateAlphaTrans();
 
     mainScene.onPointerMove = function (event, pickResult) {
         if (mainUI.isMeshHover) {
@@ -251,10 +260,6 @@ const createLayer = function(layer_index) {
         sell_mesh.line.parent = main3D.meshes[layer_index].transformY;
         main3D.meshes[layer_index].sells.push([sell_mesh.mesh, sell_mesh.line]);
     };
-
-    // TO-DO Set Alpha Transparency
-    main3D.meshes[layer_index].buys.forEach(setAlphaTrans);
-    main3D.meshes[layer_index].sells.forEach(setAlphaTrans);
 
     // add selected line to highlight layer
     if(mainUI.lineSelect >= 0) {
@@ -414,13 +419,77 @@ const getRowGeometry = function(orders, row_index, ind_buy){
         const pr_val = (ind_buy) ? orders[i].max : orders[i].min;
         const tr_vol = orders[i].total;
         resPath.push(new BABYLON.Vector3(
-            ((pr_val / mapData.maxBuy) * CENV.MAP_RESOLUTION) + (ind_buy ? -0.5 : 0.5),
+            ((pr_val / mapData.maxBuy) * (CENV.MAP_RESOLUTION * 0.5)),// + (ind_buy ? -0.5 : 0.5),
             (p1_y = (optAdd ? p1_y : 0) + (tr_vol * ( optUsd ? (pr_val*0.0001) : 1 ) / 200)),
             (row_index * CENV.FRAME_RATE) + CENV.FRAME_RATE));
     }
 
     return resPath;
 };
+
+/**
+* Function:     initFloor()
+* Generates geometry data for our 3D floor
+*/
+const initFloor = function(){
+    // Get price scaling of floor lines
+    let fl_scale = 0;
+    const maxstr = mapData.maxBuy + "";
+    if(mapData.maxBuy < 1 && maxstr.indexOf('.')){
+        fl_scale = 1.0 / Math.pow(10, maxstr.substring(maxstr.indexOf('.') + 1).length - ((maxstr.substring(maxstr.indexOf('.') + 1) * 1) + "").length+1 );
+    } else {
+        fl_scale = Math.pow(10,  (maxstr.indexOf('.') > 0) ? maxstr.substring(0, maxstr.indexOf('.')).length - 1 : (maxstr.length - 1));
+    }
+    main3D.floor.count = 0;
+
+    main3D.floor.createLine = (geometry) => {
+        return BABYLON.MeshBuilder.CreateLines("floorLine" + (main3D.floor.count++), { points: geometry });
+     };
+
+    main3D.floor.createLineX = (x) => {
+        const nline = [
+            new BABYLON.Vector3(x, 0, 0),
+            new BABYLON.Vector3(x, 0, (CENV.DISPLAY_DEPTH * CENV.FRAME_RATE))
+        ];
+        return main3D.floor.createLine(nline);
+    };
+    
+    main3D.floor.createLineZ = (z) => {
+        const nline = [
+            new BABYLON.Vector3(0, 0, z),
+            new BABYLON.Vector3(CENV.MAP_RESOLUTION, 0, z)
+        ];
+        return main3D.floor.createLine(nline);
+    };
+
+    for(let i=1; (fl_scale * (i/10)) < (mapData.maxBuy * 2); i++){
+        //create price lines (x-axis)
+        const xval = ((fl_scale * (i/10)) / (mapData.maxBuy * 2.0)) * CENV.MAP_RESOLUTION;
+        const xline1 = main3D.floor.createLineX(xval);
+        if(i%10 == 0){
+            xline1.color = new BABYLON.Color4(0.3, 0.3, 1, 1);
+            xline1.alpha = 0.5;
+        } else if(i%5 == 0) {
+            xline1.color = new BABYLON.Color4(0.25, 0.25, 0.65, 1);
+            xline1.alpha = 0.4;
+        } else {
+            xline1.color = new BABYLON.Color4(0.15, 0.15, 0.4, 1);
+            xline1.alpha = 0.4;
+        }
+        main3D.floor.lines.prices.push(xline1);
+    }
+
+    for(let i=0; i < mapData.snapsTotal; i++){
+        //create frame lines (z-axis)
+        const zval = i * CENV.FRAME_RATE;
+        const zline1 = main3D.floor.createLineZ(zval);
+        zline1.color = new BABYLON.Color4(0.25, 0.25, 0.65, 1);
+        zline1.parent = main3D.meshes[mainUI.layers.selected].transformY;
+        main3D.floor.lines.frames.push(zline1);
+    }
+
+};
+
 
 
 /**
@@ -439,11 +508,10 @@ const setupAnimationEvents = function() {
     // Animation slider changes
     mainUI.playSlider = document.getElementById("anim-slider");
     mainUI.playSlider.min = 0;
-    mainUI.playSlider.max = (CENV.MAP_DEPTH - CENV.DISPLAY_DEPTH) * CENV.FRAME_RATE;
+    mainUI.playSlider.max = (mapData.snapsTotal) ? (mapData.snapsTotal * CENV.FRAME_RATE) : 1;
     mainUI.playSlider.oninput = function() {
         anim.transformZ.position.z = 0 - mainUI.playSlider.value;
-        meshes[mainUI.layers.selected].buys.forEach(setAlphaTrans);
-        meshes[mainUI.layers.selected].sells.forEach(setAlphaTrans);
+        updateAlphaTrans();
     };
 
     // Watch for browser/canvas resize events
@@ -467,17 +535,35 @@ const setupAnimationEvents = function() {
 
 }
 
+const updateAlphaTrans = function() {
+    main3D.meshes[mainUI.layers.selected].buys.forEach(setAlphaTrans);
+    main3D.meshes[mainUI.layers.selected].sells.forEach(setAlphaTrans);
+    main3D.floor.lines.frames.forEach((val, index) => { val.alpha = 0.5 * getFrameAlpha(index) });
+}
+
 /**
 * Function:     setAlphaTrans(alpha_val, index)
 * sets the alpha transparency of meshes on render
-*  @param {number} alpha_val - alpha value to set, between 0 and 1
+*  @param {mesh[]} alpha_val - object with alpha values, to set between 0 and 1
 *  @param {number} index - index of mesh to set
 */
 const setAlphaTrans = function(alpha_val, index) {
-    const beginZ = CENV.DISPLAY_DEPTH * CENV.FRAME_RATE;
-    let rp = (index * CENV.FRAME_RATE) + anim.transformZ.position.z;
-    let alphaOut = 1.0;
+    const alphaOut = getFrameAlpha(index);
 
+    alpha_val[0].material.alpha = ((alphaOut < 0.0) ? 0.0 : alphaOut) * CENV.MESH_ALPHA;
+    alpha_val[1].alpha = ((alphaOut < 0.0) ? 0.0 : alphaOut) * CENV.LINE_ALPHA;
+};
+
+/**
+* Function:     getFrameAlpha(index)
+* gets the alpha value for a given frame based on index value
+*  @param {number} index - index of mesh to set
+*/
+const getFrameAlpha = function(index){
+    const beginZ = CENV.DISPLAY_DEPTH * CENV.FRAME_RATE;
+    const rp = (index * CENV.FRAME_RATE) + anim.transformZ.position.z;
+    let alphaOut = 1.0;
+    
     if(rp <= 0.0) 
         // z is negative - fade alpha out
         alphaOut = (10.0 - Math.abs(rp)) / 10.0;
@@ -485,9 +571,8 @@ const setAlphaTrans = function(alpha_val, index) {
         // z is positive - fade alpha in 
         alphaOut = (10.0 - (rp - beginZ)) / 10.0;
 
-    alpha_val[0].material.alpha = ((alphaOut < 0.0) ? 0.0 : alphaOut) * CENV.MESH_ALPHA;
-    alpha_val[1].alpha = ((alphaOut < 0.0) ? 0.0 : alphaOut) * CENV.LINE_ALHPA;
-}
+    return alphaOut;
+};
 
 /**
 * Function:     selectGeometryEvent()
@@ -518,8 +603,7 @@ const selectGeometryEvent = function() {
                     else
                         createLayer(mainUI.layers.selected);
 
-                    main3D.meshes[mainUI.layers.selected].buys.forEach(setAlphaTrans);
-                    main3D.meshes[mainUI.layers.selected].sells.forEach(setAlphaTrans);
+                    updateAlphaTrans();
                 }
             };
         }
