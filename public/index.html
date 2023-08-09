@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>My Website</title>
+  <title>ORDER BOOK MATRIX</title>
   <link rel="stylesheet" href="/css/styles.css">
   <script src="https://cdn.babylonjs.com/babylon.js"></script>
   <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
@@ -13,7 +13,7 @@
 </head>
 <body>
     <div id="bd-top-menu">
-        COINBASE ORDER BOOK MATRIX VIEWER
+        COINBASE ORDER BOOK MATRIX
     </div>
     <div id="bd-left-menu">
         <div id="dval-menu" class="bc-left-sub-m">
@@ -40,6 +40,36 @@
             setupAnimationEvents();
             // :: End :: Run Application
         </script>
+    </div>
+    <div id="orders-panel">
+        <div class="orders-seperator">Sells</div>
+        <div class="orders-container">
+            <table id="orders-sells" class="orders-tbl">
+                <thead>
+                    <tr>
+                        <th class="orders-head">Price (Min)</th>
+                        <th class="orders-head">Quantity</th>
+                        <th class="orders-head">Total</th>
+                    </tr>
+                </thead>
+                <tbody id="orders-s-list">
+                </tbody>
+            </table>
+        </div>
+        <div class="orders-seperator">Buys</div>
+        <div class="orders-container">
+            <table id="orders-buys" class="orders-tbl">
+                <thead>
+                    <tr>
+                        <th class="orders-head">Price (Max)</th>
+                        <th class="orders-head">Quantity</th>
+                        <th class="orders-head">Total</th>
+                    </tr>
+                </thead>
+                <tbody id="orders-b-list">
+                </tbody>
+            </table>
+        </div>
     </div>
 </body>
 </html>

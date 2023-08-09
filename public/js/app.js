@@ -20,6 +20,7 @@ var mainUI = {
     highlightLayer: null,
     hoverLight: null,
     lineSelect: -1,
+    orderDisplay: true,
 };
 
 var main3D = {
@@ -207,6 +208,7 @@ const createScene = function () {
     
     initFloor();
     updateAlphaTrans();
+    hideOrdersTable();
 
     mainScene.onPointerMove = function (event, pickResult) {
         if (mainUI.isMeshHover) {
@@ -226,6 +228,10 @@ const createScene = function () {
                 mainUI.highlightLayer.addMesh(main3D.meshes[mainUI.layers.selected].buys[line_num][1], BABYLON.Color3.Red());
                 mainUI.highlightLayer.addMesh(main3D.meshes[mainUI.layers.selected].sells[line_num][1], BABYLON.Color3.Red());
                 mainUI.lineSelect = line_num;
+                showOrdersTable();
+                setSelectedOrders(mapData.snapshots[main3D.meshes[mainUI.layers.selected].buys[line_num][1].metadata.id]);
+            } else {
+                hideOrdersTable();
             }
         }
     };
@@ -341,7 +347,7 @@ const generateMapRow = function(snapshot, ind_buy) {
                 side: val.side,
                 total: 0
             });
-        })
+        });
     }  
 
     // Generate mesh
@@ -361,9 +367,11 @@ const generateMapRow = function(snapshot, ind_buy) {
     white_mat.wireframe = true;
     row.material = white_mat;
     row.renderingGroupId = 1;
+    row.metadata = {id: snapshot.id}
     
     let mline1 = BABYLON.MeshBuilder.CreateLines("meshLine" + uniq_name, { points: geometry_data[0] });
     mline1.color = new BABYLON.Color4(1, 1, 1, 0);
+    mline1.metadata = {id: snapshot.id}
 
     let mesh_action_manager = new BABYLON.ActionManager(mainScene);
 
@@ -614,4 +622,84 @@ const selectGeometryEvent = function() {
     }
 }
 
+/**
+* Function:     setSelectedOrders(snapshot)
+* gets the alpha value for a given frame based on index value
+*  @param {snapshot} snapshot - the snapshot object with orders to display
+*/
+const setSelectedOrders = function(snapshot){
+    try{
+        const buyTable = document.getElementById('orders-b-list');
+        if(!buyTable) {
+            throw new Error("Buys Table Not Found");
+        }
+        const newBuyTable = document.createElement('tbody');
+        buyTable.parentNode.replaceChild(newBuyTable, buyTable);
+        newBuyTable.id = 'orders-b-list';
+        if (snapshot.orders.buys.length > 0) {
+            snapshot.orders.buys.forEach((val) => {
+                const row = newBuyTable.insertRow();
+                const c1 = row.insertCell(0);
+                c1.innerText = (Math.round(val.max * 100.0)/100.0).toFixed(2);
+                c1.classList.add('orders-row');
+                const c2 = row.insertCell(1);
+                c2.innerText = Math.round(val.total * 100.0)/100.0;
+                c2.classList.add('orders-row');
+                const c3 = row.insertCell(2);
+                c3.innerText = (Math.round(val.max * val.total * 100.0)/100.0).toFixed(2);
+                c3.classList.add('orders-row');
+            });
+        }
+
+        const sellTable = document.getElementById('orders-s-list');
+        if(!sellTable) {
+            throw new Error("Sells Table Not Found");
+        }
+        const newSellTable = document.createElement('tbody');
+        sellTable.parentNode.replaceChild(newSellTable, sellTable);
+        newSellTable.id = 'orders-s-list';
+        if (snapshot.orders.sells.length > 0) {
+            snapshot.orders.sells.slice().reverse().forEach((val) => {
+                const row = newSellTable.insertRow();
+                const c1 = row.insertCell(0);
+                c1.innerText = (Math.round(val.min * 100.0)/100.0).toFixed(2);
+                c1.classList.add('orders-row');
+                const c2 = row.insertCell(1);
+                c2.innerText = Math.round(val.total * 100.0)/100.0;
+                c2.classList.add('orders-row');
+                const c3 = row.insertCell(2);
+                c3.innerText = (Math.round(val.min * val.total * 100.0)/100.0).toFixed(2);
+                c3.classList.add('orders-row');
+            });
+        }
+        newSellTable.scrollTop = newSellTable.scrollHeight;
+    } catch(e){
+        console.log("Error Loading Order Selection!");
+        console.error(e);
+    }
+}
+
+/**
+* Function:     showOrdersTable()
+* shows the UI orders container
+*/
+const showOrdersTable = function() {
+    if(!mainUI.orderDisplay){
+        const orderCont = document.getElementById('orders-panel');
+        orderCont.style.display = "block";
+        mainUI.orderDisplay = true;
+    }
+}
+
+/**
+* Function:     hideOrdersTable()
+* hides the UI orders container
+*/
+const hideOrdersTable = function() {
+    if(mainUI.orderDisplay){
+        const orderCont = document.getElementById('orders-panel');
+        orderCont.style.display = "none";
+        mainUI.orderDisplay = false;
+    }
+}
 

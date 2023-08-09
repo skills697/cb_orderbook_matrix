@@ -19,22 +19,28 @@ html, body {
     z-index: 1;
     width: 240px;
     height: 100%;
-    padding-top: 60px;
+    margin-top: 48px;
     background-color: rgb(44, 44, 44);
     color: rgb(200, 200, 200);
+    border-right: 1px solid rgb(72, 72, 72);
 }
 
 #bd-top-menu {
     position: fixed;
     z-index: 2;
     width: 100%;
-    height: 60px;
-    background-color: rgb(23, 21, 43)
+    height: 24px;
+    color: rgb(246, 246, 246);
+    font-size: 20px;
+    padding: 12px;
+    background-color: #85664e;
+    box-shadow: 10px 0px 5px 0px #000;
+    text-shadow: 1px 0px 2px #242424;
 }
 
 #bd-main {
     margin-left: 200px;
-    margin-top: 60px;
+    margin-top: 48px;
 }
 
 .bc-left-sub-m {
@@ -83,4 +89,76 @@ div.bc-dval-opt-sel {
 
 .bc-dval-opt-hid {
     display: none;
+}
+
+#orders-panel {
+    width: 280px;
+    height: 800px;
+    top: 58px;
+    right: 10px;
+    position: absolute;
+    background: none;
+}
+
+.orders-container {
+    width: 100%;
+    border-collapse: collapse;
+    background-color: #0f0f0f;
+    border: 1px solid #3a464a;
+}
+
+.orders-tbl {
+    width: 280px;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+.orders-tbl tbody {
+    display: block;
+    width: 100%;
+    height: 340px;
+    overflow-y: auto;
+}
+
+.orders-tbl thead tr {
+    display: block;
+}
+
+.orders-tbl tbody tr td {
+    width: 92px;
+}
+.orders-tbl tbody tr:last-of-type td {
+    border: none;
+}
+
+#orders-s-list, #orders-b-list {
+    overflow-y: scroll;
+}
+
+.orders-head {
+    width: 92px;
+    color:rgb(112, 112, 112);
+    text-align: left;
+    font-size: 12px;
+    line-height: 20px;
+    border-bottom: 1px solid #3a464a;
+    padding: 0px 4px;
+}
+
+.orders-row {
+    color:rgb(186, 186, 186);
+    text-align: left;
+    font-size: 12px;
+    line-height: 20px;
+    border-bottom: 1px solid #3a464a;
+    padding: 0px 4px;
+}
+
+.orders-seperator {
+    min-height: 20px;
+    box-sizing: border-box;
+    color:rgb(186, 186, 186);
+    text-align: right;
+    font-size: 16px;
+    text-shadow: 1px 0px 2px #000;
+    line-height: 20px;
 }
