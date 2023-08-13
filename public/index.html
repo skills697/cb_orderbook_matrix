@@ -41,34 +41,63 @@
             // :: End :: Run Application
         </script>
     </div>
-    <div id="orders-panel">
-        <div class="orders-seperator">Sells</div>
-        <div class="orders-container">
-            <table id="orders-sells" class="orders-tbl">
-                <thead>
-                    <tr>
-                        <th class="orders-head">Price (Min)</th>
-                        <th class="orders-head">Quantity</th>
-                        <th class="orders-head">Total</th>
-                    </tr>
-                </thead>
-                <tbody id="orders-s-list">
-                </tbody>
-            </table>
+    <div id="mright">
+        <div id="candle-panel">
+            <div class="right-seperator">Candle</div>
+            <div class="candle-container candle-cont-first">
+                <div class="candle-lbl">Time</div>
+                <div class="candle-field" id="candle-sel-time">0.0</div>
+            </div>
+            <div class="candle-container">
+                <div class="candle-lbl">Volume</div>
+                <div class="candle-field" id="candle-sel-vol">0.0</div>
+            </div>
+            <div class="candle-container">
+                <div class="candle-lbl">High</div>
+                <div class="candle-field" id="candle-sel-high">0.0</div>
+            </div>
+            <div class="candle-container">
+                <div class="candle-lbl">Low</div>
+                <div class="candle-field" id="candle-sel-low">0.0</div>
+            </div>
+            <div class="candle-container">
+                <div class="candle-lbl">Open</div>
+                <div class="candle-field" id="candle-sel-open">0.0</div>
+            </div>
+            <div class="candle-container">
+                <div class="candle-lbl">Close</div>
+                <div class="candle-field" id="candle-sel-close">0.0</div>
+            </div>
         </div>
-        <div class="orders-seperator">Buys</div>
-        <div class="orders-container">
-            <table id="orders-buys" class="orders-tbl">
-                <thead>
-                    <tr>
-                        <th class="orders-head">Price (Max)</th>
-                        <th class="orders-head">Quantity</th>
-                        <th class="orders-head">Total</th>
-                    </tr>
-                </thead>
-                <tbody id="orders-b-list">
-                </tbody>
-            </table>
+        <div id="orders-panel">
+            <div class="right-seperator">Sells</div>
+            <div class="orders-container">
+                <table id="orders-sells" class="orders-tbl">
+                    <thead>
+                        <tr>
+                            <th class="orders-head">Price (Min)</th>
+                            <th class="orders-head">Quantity</th>
+                            <th class="orders-head">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-s-list">
+                    </tbody>
+                </table>
+            </div>
+            <div class="right-seperator">Buys</div>
+            <div class="orders-container">
+                <table id="orders-buys" class="orders-tbl">
+                    <thead>
+                        <tr>
+                            <th class="orders-head">Price (Max)</th>
+                            <th class="orders-head">Quantity</th>
+                            <th class="orders-head">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody id="orders-b-list">
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </body>

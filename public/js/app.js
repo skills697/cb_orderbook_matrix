@@ -20,7 +20,8 @@ var mainUI = {
     highlightLayer: null,
     hoverLight: null,
     lineSelect: -1,
-    orderDisplay: true,
+    candleDisplay: false,
+    orderDisplay: false,
 };
 
 var main3D = {
@@ -208,11 +209,11 @@ const createScene = function () {
     
     initFloor();
     updateAlphaTrans();
-    hideOrdersTable();
 
     mainScene.onPointerMove = function (event, pickResult) {
         if (mainUI.isMeshHover) {
             mainUI.hoverLight.position = new BABYLON.Vector3(pickResult.pickedPoint.x, pickResult.pickedPoint.y+1, pickResult.pickedPoint.z);
+            //Add the display price data on hover here
         }
     }
 
@@ -224,14 +225,18 @@ const createScene = function () {
             }
 
             if(mainUI.isMeshHover) {
-                let line_num = Math.round((pickResult.pickedPoint.z - anim.transformZ.position.z - 10.0)/10.0);
+                const line_num = Math.round((pickResult.pickedPoint.z - anim.transformZ.position.z - 10.0)/10.0);
+                const sel_snapshot = mapData.snapshots[main3D.meshes[mainUI.layers.selected].buys[line_num][1].metadata.id];
                 mainUI.highlightLayer.addMesh(main3D.meshes[mainUI.layers.selected].buys[line_num][1], BABYLON.Color3.Red());
                 mainUI.highlightLayer.addMesh(main3D.meshes[mainUI.layers.selected].sells[line_num][1], BABYLON.Color3.Red());
                 mainUI.lineSelect = line_num;
                 showOrdersTable();
-                setSelectedOrders(mapData.snapshots[main3D.meshes[mainUI.layers.selected].buys[line_num][1].metadata.id]);
+                showCandlePanel();
+                setSelectedOrders(sel_snapshot);
+                setSelectedCandle(sel_snapshot);
             } else {
                 hideOrdersTable();
+                hideCandlePanel();
             }
         }
     };
@@ -700,6 +705,58 @@ const hideOrdersTable = function() {
         const orderCont = document.getElementById('orders-panel');
         orderCont.style.display = "none";
         mainUI.orderDisplay = false;
+    }
+}
+
+/**
+* Function:     setSelectedCandle()
+* sets the data fields for the currently selected candle
+*  @param {snapshot} snapshot - the snapshot object with orders to display
+*/
+const setSelectedCandle = function(snapshot){
+    const candle = snapshot.candle;
+    const time_f = document.getElementById('candle-sel-time');
+    const vol_f = document.getElementById('candle-sel-vol');
+    const high_f = document.getElementById('candle-sel-high');
+    const low_f = document.getElementById('candle-sel-low');
+    const open_f = document.getElementById('candle-sel-open');
+    const close_f = document.getElementById('candle-sel-close');
+
+    if(!time_f || !vol_f || !high_f || !low_f || !open_f || !close_f){
+        throw new Error("Candle Fields Not Found");
+    }
+
+    const timeDte = new Date(candle.start * 1000);
+    time_f.innerText = timeDte.toLocaleDateString("en-US") + " - " + timeDte.toLocaleTimeString("en-US");
+    vol_f.innerText = (Math.round(candle.volume * 100.0)/100.0).toFixed(2);
+    high_f.innerText = (Math.round(candle.high * 100.0)/100.0).toFixed(2);
+    low_f.innerText = (Math.round(candle.low * 100.0)/100.0).toFixed(2);
+    open_f.innerText = (Math.round(candle.open * 100.0)/100.0).toFixed(2);
+    close_f.innerText = (Math.round(candle.close * 100.0)/100.0).toFixed(2);
+
+}
+
+/**
+* Function:     showCandlePanel()
+* shows the UI orders container
+*/
+const showCandlePanel = function() {
+    if(!mainUI.candleDisplay){
+        const candleCont = document.getElementById('candle-panel');
+        candleCont.style.display = "block";
+        mainUI.candleDisplay = true;
+    }
+}
+
+/**
+* Function:     hideCandlePanel()
+* hides the UI orders container
+*/
+const hideCandlePanel = function() {
+    if(mainUI.candleDisplay){
+        const candleCont = document.getElementById('candle-panel');
+        candleCont.style.display = "none";
+        mainUI.candleDisplay = false;
     }
 }
 
