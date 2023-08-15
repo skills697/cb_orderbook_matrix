@@ -18,10 +18,21 @@ var mainUI = {
     },
     selectMesh: [],
     highlightLayer: null,
-    hoverLight: null,
+    hover: {
+        light: null,
+        line: null,
+        point: null,
+        elem: {
+            time: null,
+            price: null,
+            val: null,
+        },
+    },
     lineSelect: -1,
+    hoverDisplay: false,
     candleDisplay: false,
     orderDisplay: false,
+    dollarFormat: null,
 };
 
 var main3D = {
@@ -36,6 +47,7 @@ var main3D = {
             frames: [],
         },
     },
+    x_price_scale: 1,
 }
 
 var anim = {
@@ -89,7 +101,7 @@ const prepareData = async () => {
             if(!("orders" in mapData.snapshots[order_snaps[order_id].snapshot])) {
                 mapData.snapshots[order_snaps[order_id].snapshot].orders = {
                     buys: [],
-                    sells: []
+                    sells: [] 
                 }
             }
             order_snaps[order_id].orders.forEach((n_order) => {
@@ -141,6 +153,7 @@ const initScene = function (main_engine, main_canvas) {
     console.log("Initializing Scene");
     main3D.engine = main_engine;
     mainScene = new BABYLON.Scene(main3D.engine);
+    mainUI.dollarFormat = new Intl.NumberFormat( "en-US", {style: "currency", currency: "USD", minimumFractionDigits: 2});
 
     main3D.texture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("GUI", true, mainScene);    
     mainCamera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(0.5 * CENV.MAP_RESOLUTION, 30, 0), mainScene);
@@ -172,8 +185,12 @@ const initScene = function (main_engine, main_canvas) {
 * Render the scene
 */
 const renderScene = function () {
-    if(mainUI.hoverLight != null && mainUI.hoverLight.isEnabled() != mainUI.isMeshHover) {
-        mainUI.hoverLight.setEnabled(mainUI.isMeshHover);
+    if(mainUI.hover.light != null && mainUI.hover.light.isEnabled() != mainUI.isMeshHover) {
+        mainUI.hover.light.setEnabled(mainUI.isMeshHover);
+    }
+    if(mainUI.hover.line != null && mainUI.hover.line.isEnabled() != mainUI.isMeshHover) {
+        //console.log((mainUI.isMeshHover) ? "Hiding Hover Line" : "Showing Hover Line");
+        mainUI.hover.line.setEnabled(mainUI.isMeshHover);
     }
 
     if(mainUI.lineSelect >= 0) {
@@ -201,19 +218,50 @@ const createScene = function () {
     //Initialize Meshes for selected layer
     createLayer(mainUI.layers.selected);
 
-    mainUI.hoverLight = new BABYLON.PointLight("light", new BABYLON.Vector3(0, 0, 0), mainScene);
-    mainUI.hoverLight.diffuse = new BABYLON.Color3(1, 0.9, 0.65);
-    mainUI.hoverLight.specular = new BABYLON.Color3(1, 0.9, 0.65);
-    mainUI.hoverLight.range = 5;
-    mainUI.hoverLight.setEnabled(false);
+    mainUI.hover.light = new BABYLON.PointLight("light", new BABYLON.Vector3(0, 0, 0), mainScene);
+    mainUI.hover.light.diffuse = new BABYLON.Color3(1, 0.9, 0.65);
+    mainUI.hover.light.specular = new BABYLON.Color3(1, 0.9, 0.65);
+    mainUI.hover.light.range = 5;
+    mainUI.hover.light.setEnabled(false);
+
+    mainUI.hover.line = BABYLON.MeshBuilder.CreateLines("meshHoverLine", { 
+        points: [new BABYLON.Vector3(0,0,0), new BABYLON.Vector3(1,1,1)],
+        updatable: true,
+    });
+    mainUI.hover.line.color = new BABYLON.Color4(1, 0.85, 0.21, 1);
+    mainUI.hover.line.renderingGroupId = 1;
+    mainUI.hover.line.alwaysSelectAsActiveMesh = true;
+    mainUI.hover.line.setEnabled(false);
+
+    // mainUI.hover.point = BABYLON.MeshBuilder.CreateSphere("meshHoverPoint", {
+    //     diameter: 0.5, 
+    // });  
+    // mainUI.hover.point.position.y -= 1;   
+    // let hoverMat = new BABYLON.StandardMaterial("meshHoverPointMat", mainScene);
+    // hoverMat.diffuseColor = new BABYLON.Color3(1, 0.85, 0.21);
+    // hoverMat.ambientColor = new BABYLON.Color3(1, 0.85, 0.21);
+    // hoverMat.specularColor = new BABYLON.Color3(1, 0.95, 0.65);
+    // mainUI.hover.point.material = hoverMat;
+    // mainUI.hover.point.parent = mainUI.hover.light;
     
     initFloor();
     updateAlphaTrans();
 
     mainScene.onPointerMove = function (event, pickResult) {
         if (mainUI.isMeshHover) {
-            mainUI.hoverLight.position = new BABYLON.Vector3(pickResult.pickedPoint.x, pickResult.pickedPoint.y+1, pickResult.pickedPoint.z);
+            mainUI.hover.light.position = new BABYLON.Vector3(pickResult.pickedPoint.x, pickResult.pickedPoint.y+1, pickResult.pickedPoint.z);
             //Add the display price data on hover here
+            mainUI.hover.line = BABYLON.MeshBuilder.CreateLines(null, {
+                points: [
+                    new BABYLON.Vector3(pickResult.pickedPoint.x,0,pickResult.pickedPoint.z), 
+                    new BABYLON.Vector3(pickResult.pickedPoint.x,pickResult.pickedPoint.y,pickResult.pickedPoint.z)
+                ], 
+                instance: mainUI.hover.line 
+            });
+            updateHoverPanel(pickResult.pickedPoint.x,pickResult.pickedPoint.y,pickResult.pickedPoint.z);
+            showHoverPanel();
+        } else {
+            hideHoverPanel();
         }
     }
 
@@ -454,6 +502,7 @@ const initFloor = function(){
         fl_scale = Math.pow(10,  (maxstr.indexOf('.') > 0) ? maxstr.substring(0, maxstr.indexOf('.')).length - 1 : (maxstr.length - 1));
     }
     main3D.floor.count = 0;
+    main3D.x_price_scale = fl_scale;
 
     main3D.floor.createLine = (geometry) => {
         return BABYLON.MeshBuilder.CreateLines("floorLine" + (main3D.floor.count++), { points: geometry });
@@ -503,8 +552,6 @@ const initFloor = function(){
 
 };
 
-
-
 /**
 * Function:     setupAnimationEvents()
 * Setup UI for controlling animations
@@ -548,6 +595,10 @@ const setupAnimationEvents = function() {
 
 }
 
+/**
+* Function:     updateAlphaTrans()
+* updates the alpha transparency of meshes on render
+*/
 const updateAlphaTrans = function() {
     main3D.meshes[mainUI.layers.selected].buys.forEach(setAlphaTrans);
     main3D.meshes[mainUI.layers.selected].sells.forEach(setAlphaTrans);
@@ -726,19 +777,19 @@ const setSelectedCandle = function(snapshot){
         throw new Error("Candle Fields Not Found");
     }
 
-    const timeDte = new Date(candle.start * 1000);
+    const timeDte = new Date((candle.start+300) * 1000);
     time_f.innerText = timeDte.toLocaleDateString("en-US") + " - " + timeDte.toLocaleTimeString("en-US");
-    vol_f.innerText = (Math.round(candle.volume * 100.0)/100.0).toFixed(2);
-    high_f.innerText = (Math.round(candle.high * 100.0)/100.0).toFixed(2);
-    low_f.innerText = (Math.round(candle.low * 100.0)/100.0).toFixed(2);
-    open_f.innerText = (Math.round(candle.open * 100.0)/100.0).toFixed(2);
-    close_f.innerText = (Math.round(candle.close * 100.0)/100.0).toFixed(2);
+    vol_f.innerText = (Math.round(candle.volume * 1000.0)/1000.0).toFixed(3);
+    high_f.innerText = mainUI.dollarFormat.format(candle.high);
+    low_f.innerText = mainUI.dollarFormat.format(candle.low);
+    open_f.innerText = mainUI.dollarFormat.format(candle.open);
+    close_f.innerText = mainUI.dollarFormat.format(candle.close);
 
 }
 
 /**
 * Function:     showCandlePanel()
-* shows the UI orders container
+* shows the UI candle container
 */
 const showCandlePanel = function() {
     if(!mainUI.candleDisplay){
@@ -750,7 +801,7 @@ const showCandlePanel = function() {
 
 /**
 * Function:     hideCandlePanel()
-* hides the UI orders container
+* hides the UI candle container
 */
 const hideCandlePanel = function() {
     if(mainUI.candleDisplay){
@@ -760,3 +811,55 @@ const hideCandlePanel = function() {
     }
 }
 
+/**
+* Function:     updateHoverPanel()
+* sets the data fields for the point currently being hovered
+*  @param {number} pX - the x coordinate of the pointer
+*  @param {number} pY - the y coordinate of the pointer
+*  @param {number} pZ - the z coordinate of the pointer
+*/
+const updateHoverPanel = function(pX, pY, pZ){
+    if(!mainUI.hover.elem.time || !mainUI.hover.elem.price || !mainUI.hover.elem.vol) {
+        const time_f = document.getElementById('hover-time');
+        const price_f = document.getElementById('hover-price');
+        const vol_f = document.getElementById('hover-vol');
+    
+        if(!time_f || !vol_f || !price_f){
+            throw new Error("Hover Fields Not Found");
+        }
+        mainUI.hover.elem.time = time_f;
+        mainUI.hover.elem.price = price_f;
+        mainUI.hover.elem.vol = vol_f;
+    }
+
+    const z_eff = pZ - anim.transformZ.position.z;
+    const dt_offset = (z_eff / CENV.FRAME_RATE) * 300;
+    const dt_eff = new Date((mapData.startTime + dt_offset) * 1000);
+    mainUI.hover.elem.time.innerText = dt_eff.toLocaleDateString("en-US") + " - " + dt_eff.toLocaleTimeString("en-US");
+    mainUI.hover.elem.vol.innerText = (Math.round((pY * 200.0) * 1000.0)/1000.0).toFixed(3);
+    mainUI.hover.elem.price.innerText = mainUI.dollarFormat.format((pX / CENV.MAP_RESOLUTION) * (mapData.maxBuy * 2));
+}
+
+/**
+* Function:     showHoverPanel()
+* shows the UI hover container
+*/
+const showHoverPanel = function() {
+    if(!mainUI.hoverDisplay){
+        const hoverCont = document.getElementById('hover-panel');
+        hoverCont.style.display = "block";
+        mainUI.hoverDisplay = true;
+    }
+}
+
+/**
+* Function:     hideHoverPanel()
+* hides the UI hover container
+*/
+const hideHoverPanel = function() {
+    if(mainUI.hoverDisplay){
+        const hoverCont = document.getElementById('hover-panel');
+        hoverCont.style.display = "none";
+        mainUI.hoverDisplay = false;
+    }
+}
