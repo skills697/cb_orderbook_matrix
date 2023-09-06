@@ -1,4 +1,14 @@
 {
+  "name": "cb-orderbook-matrix",
+  "version": "1.1.0",
+  "description": "3D web visual of coinbase orderbook data",
+  "main":"api.js",
+  "scripts": {
+    "wbegin": "node api.js"
+  },
+  "keywords": ["coinbase", "orderbook"],
+  "author": "Patrick Howe",
+  "license": "UNLICENSED",
   "dependencies": {
     "coinbase-pro": "^0.9.0",
     "dotenv": "^16.0.3",

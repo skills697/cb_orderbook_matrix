@@ -18,7 +18,7 @@ html, body {
     position: fixed;
     z-index: 1;
     width: 240px;
-    height: 100%;
+    height: calc(100% - 48px);
     margin-top: 48px;
     background-color: rgb(44, 44, 44);
     color: rgb(200, 200, 200);
@@ -39,8 +39,9 @@ html, body {
 }
 
 #bd-main {
-    margin-left: 200px;
+    margin-left: 240px;
     margin-top: 48px;
+    height: calc(100% - 48px);
 }
 
 .bc-left-sub-m {
@@ -94,7 +95,7 @@ div.bc-dval-opt-sel {
 
 #mleft {
     width: 160px;
-    height: 800px;
+    height: 100%;
     top: 58px;
     left: 250px;
     position: absolute;
@@ -238,3 +239,32 @@ div.bc-dval-opt-sel {
     text-shadow: 1px 0px 2px #000;
     line-height: 20px;
 }
+
+.mbottom {
+    position: fixed;
+    margin-left: 240px;
+    padding-bottom: 20px;
+    bottom: 0;
+    width: calc(100% - 240px);
+    display: flex;
+    justify-content: center;
+}
+
+#sn-time-cont {
+    width: 500px;
+    background-color: #12121c;
+    border: 1px solid #3a464a;
+}
+#sn-time-gfx {
+    width:100%;
+}
+.sn-time-s1 {
+    stop-color: #3a464a;
+    stop-opacity: 0%;
+}
+.sn-time-s2 {
+    stop-color: #3a464a;
+    stop-opacity: 100%;
+}
+
+

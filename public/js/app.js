@@ -6,7 +6,7 @@ const CENV = {
     MESH_ALPHA: 0.3,
     LINE_ALPHA: 0.7,
     TIME_GRANULARITY: 300,
-}
+};
 
 // global variables
 var mainScene;
@@ -48,12 +48,12 @@ var main3D = {
         },
     },
     x_price_scale: 1,
-}
+};
 
 var anim = {
     playing: false,
     transformZ: null,
-}
+};
 
 var mapData = {
     maxBuy: 0,
@@ -104,10 +104,11 @@ const prepareData = async () => {
                     sells: [] 
                 }
             }
-            order_snaps[order_id].orders.forEach((n_order) => {
+            order_snaps[order_id].orders.forEach((n_order, n_index) => {
                 if(n_order.side == 'buy') {
                     mapData.snapshots[order_snaps[order_id].snapshot].orders.buys.push(n_order);
-                } else {
+                } else if((128 - n_index) < 100) {
+                    // Currently Capturing only the lowest 100 sell groups, but could be later expanded to flexibly select more/less
                     mapData.snapshots[order_snaps[order_id].snapshot].orders.sells.unshift(n_order);
                 }
             });
@@ -189,7 +190,6 @@ const renderScene = function () {
         mainUI.hover.light.setEnabled(mainUI.isMeshHover);
     }
     if(mainUI.hover.line != null && mainUI.hover.line.isEnabled() != mainUI.isMeshHover) {
-        //console.log((mainUI.isMeshHover) ? "Hiding Hover Line" : "Showing Hover Line");
         mainUI.hover.line.setEnabled(mainUI.isMeshHover);
     }
 
@@ -246,6 +246,7 @@ const createScene = function () {
     
     initFloor();
     updateAlphaTrans();
+    initTimeGfx();
 
     mainScene.onPointerMove = function (event, pickResult) {
         if (mainUI.isMeshHover) {
@@ -784,7 +785,6 @@ const setSelectedCandle = function(snapshot){
     low_f.innerText = mainUI.dollarFormat.format(candle.low);
     open_f.innerText = mainUI.dollarFormat.format(candle.open);
     close_f.innerText = mainUI.dollarFormat.format(candle.close);
-
 }
 
 /**
@@ -862,4 +862,69 @@ const hideHoverPanel = function() {
         hoverCont.style.display = "none";
         mainUI.hoverDisplay = false;
     }
+}
+
+/**
+* Function:     initTimeGfx()
+* setup for timeline graphics SVG
+*/
+const initTimeGfx = function () {
+    const svgns = 'http://www.w3.org/2000/svg';
+    const svgCont = document.getElementById('sn-time-gfx');
+    let initPath = document.createElementNS(svgns,"path");
+    const snapKeys = Object.keys(mapData.snapshots).sort();
+    const wSvg = svgCont.clientWidth;
+    const hSvg = svgCont.clientHeight;
+
+    let maxSny = 0;
+    let minSny = 0;
+    snapKeys.forEach((key, index) => {
+        const snap = mapData.snapshots[key];
+        if(index == 0) {
+            maxSny = snap.candle.open;
+            minSny = snap.candle.open;
+        }
+        if (maxSny < snap.candle.close) {
+            maxSny = snap.candle.close;
+        }
+        if (minSny > snap.candle.close) {
+            minSny = snap.candle.close;
+        }
+    });
+
+    const vSny = maxSny - minSny;
+    let dPath = "";
+    snapKeys.forEach((key, index) => {
+        const snap = mapData.snapshots[key];
+        if(index == 0){
+            dPath += "M 0 " + (hSvg - (((snap.candle.open - minSny)/vSny) * (100.0/hSvg)));
+        }
+        dPath += " L " + (wSvg * ((index + 1)/snapKeys.length)) + " " + (hSvg - (((snap.candle.close - minSny)/vSny)  * hSvg));
+    });
+
+    initPath.setAttributeNS(null, "d", dPath);
+    initPath.setAttributeNS(null, "stroke", "#74ff00");
+    initPath.setAttributeNS(null, "stroke-width", "2");
+    initPath.setAttributeNS(null, "fill", "transparent");
+    svgCont.replaceChildren(initPath);
+    
+    //Change the below to create a rectangle shape and assign it the following property: fill="url(#sn-time-gfx-lg)"
+    const lgrad = document.createElementNS(svgns, "linearGradient");
+    lgrad.setAttribute("id", "sn-time-gfx-lg");
+    lgrad.setAttribute("x1", "0%");
+    lgrad.setAttribute("x2", "100%");
+    lgrad.setAttribute("y1", "0%");
+    lgrad.setAttribute("y2", "0%");
+    svgCont.appendChild(lgrad);
+
+    const stopData = [[1,"0"], [1,".10"], [0,".15"], [0,".20"], [1,".25"], [1,"1.0"]];
+    stopData.forEach((val, index) => {
+        let stop = document.createElementNS(svgns, "stop");
+        stop.setAttribute("id", "sn-time-gfx-stop"+index);
+        stop.setAttribute("offset", val[1]);
+        stop.setAttribute("stop-color", "#3a464a")
+        stop.setAttribute("stop-opacity", (val[0] ? "100%" : "0%"));
+        lgrad.appendChild(stop);
+    })
+    
 }
