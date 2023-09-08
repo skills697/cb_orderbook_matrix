@@ -9,4 +9,7 @@ Complete with animation to show changes to the orderbook mapped to time and cand
 
 Also contains some basic scripting for capturing and storing the orderbook data to a postgresql database on a regular interval, which can be used by the web application's API.
 
+A more improved CLI program I wrote in GO, which has a much more improved process for capturing and grouping all of the orders from coinbase and updating the database tables accordingly.
+https://github.com/skills697/cb_orderbook_cli
+
 Very much an early work in progress prototype.
