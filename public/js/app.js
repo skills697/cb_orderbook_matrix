@@ -1,4 +1,8 @@
-// environment variables
+
+/**
+ * Environment Variables
+ * @type {{ FRAME_RATE: number; MAP_RESOLUTION: number; DISPLAY_DEPTH: number; MESH_ALPHA: number; LINE_ALPHA: number; TIME_GRANULARITY: number; }}
+ */
 const CENV = {
     FRAME_RATE: 10,
     MAP_RESOLUTION: 100,
@@ -8,10 +12,11 @@ const CENV = {
     TIME_GRANULARITY: 300,
 };
 
-// global variables
-var mainScene;
-var mainCamera;
-
+/**
+ * Global UI Elements
+ * @namespace mainUI
+ * @type {{ layers: { selected: string; }; selectMesh: {}; highlightLayer: any; hover: { light: any; line: any; point: any; elem: { time: any; price: any; val: any; }; }; lineSelect: number; hoverDisplay: boolean; candleDisplay: boolean; orderDisplay: boolean; dollarFormat: any; }}
+ */
 var mainUI = { 
     layers: {
         selected: "0"
@@ -35,7 +40,14 @@ var mainUI = {
     dollarFormat: null,
 };
 
+/**
+ * Global 3D Geometry Vars
+ * @namespace main3D
+ * @type {{ engine: BABYLON.Engine; texture: any; selectUI: any; meshes: [BABYLON.Mesh]; isMeshHover: boolean; floor: { lines: { prices: {}; frames: {}; }; }; }}
+ */
 var main3D = {
+    scene: null,
+    camera: null,
     engine: null,
     texture: null,
     selectUI: null,
@@ -47,14 +59,27 @@ var main3D = {
             frames: [],
         },
     },
-    x_price_scale: 1,
 };
 
+/**
+ * @namespace anim
+ * @type {{ playing: boolean; transformZ: any; snTimeLeft: any; snTimeRight: any; snTimeSvg: any; snTimeDragging: boolean; snTimeSelect: boolean; setTimePosition: (inputPos: any) => any; }}
+ */
 var anim = {
     playing: false,
     transformZ: null,
+    snTimeLeft: null,
+    snTimeRight: null,
+    snTimeSvg: null,
+    snTimeDragging: false,
+    snTimeSelect: false,
+    setTimePosition: (inputPos) => { return null },
 };
 
+/**
+ * @namespace mapData
+ * @type {{ maxBuy: number; startTime: number; endTime: number; snapshots: {}; snapsTotal: number; }}
+ */
 var mapData = {
     maxBuy: 0,
     startTime: 0,
@@ -64,8 +89,7 @@ var mapData = {
 };
 
 /**
-* Function: prepareData()
-* Decription: Retrieve order book snapshot data from server for buys and sells
+* @description Retrieve order book snapshot data from server for buys and sells
 */
 const prepareData = async () => {
     console.log("Preparing Data");
@@ -131,10 +155,6 @@ const prepareData = async () => {
         console.log("Candles Found!");
 
         mapData.snapsTotal = Object.keys(mapData.snapshots).length;
-        if(mainUI.playSlider){
-            mainUI.playSlider.max = (mapData.snapsTotal) ? (mapData.snapsTotal * CENV.FRAME_RATE) : 1;
-        }
-    
         console.log("Creating Scene");
         createScene();
         
@@ -145,45 +165,43 @@ const prepareData = async () => {
 
 
 /**
-* Function: initScene()
-* Generate the scene for our data to be rendered
+* @description Generate the scene for our data to be rendered
 * @param {BABYLON.Engine} main_engine - the main babylon engine
 * @param {HTMLCanvasElement} main_canvas - the canvas element
 */
 const initScene = function (main_engine, main_canvas) {
     console.log("Initializing Scene");
     main3D.engine = main_engine;
-    mainScene = new BABYLON.Scene(main3D.engine);
+    main3D.scene = new BABYLON.Scene(main3D.engine);
     mainUI.dollarFormat = new Intl.NumberFormat( "en-US", {style: "currency", currency: "USD", minimumFractionDigits: 2});
 
-    main3D.texture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("GUI", true, mainScene);    
-    mainCamera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(0.5 * CENV.MAP_RESOLUTION, 30, 0), mainScene);
-    mainCamera.inputs.addMouseWheel();
-    mainCamera.setTarget(new BABYLON.Vector3(0.5 * CENV.MAP_RESOLUTION, 25, CENV.DISPLAY_DEPTH * CENV.FRAME_RATE));
-    mainCamera.attachControl(main_canvas, true);
+    main3D.texture = BABYLON.GUI.AdvancedDynamicTexture.CreateFullscreenUI("GUI", true, main3D.scene);    
+    main3D.camera = new BABYLON.FreeCamera("camera1", new BABYLON.Vector3(0.5 * CENV.MAP_RESOLUTION, 30, 0), main3D.scene);
+    main3D.camera.inputs.addMouseWheel();
+    main3D.camera.setTarget(new BABYLON.Vector3(0.5 * CENV.MAP_RESOLUTION, 25, CENV.DISPLAY_DEPTH * CENV.FRAME_RATE));
+    main3D.camera.attachControl(main_canvas, true);
 
     var hlight1 = new BABYLON.HemisphericLight("HemisphericLight1", new BABYLON.Vector3(1, 1, 0));
     hlight1.diffuse = new BABYLON.Color3(0.63, 0.86, 0.97);
     hlight1.specular = new BABYLON.Color3(0.37, 0.59, 0.65);
     hlight1.intensity = 0.65;
 
-    var dlight1 = new BABYLON.DirectionalLight("DirectionalLight1", new BABYLON.Vector3(-0.15, -1, -0.2), mainScene);
+    var dlight1 = new BABYLON.DirectionalLight("DirectionalLight1", new BABYLON.Vector3(-0.15, -1, -0.2), main3D.scene);
     dlight1.diffuse = new BABYLON.Color3(0.97, 0.78, 0.36);
     dlight1.specular = new BABYLON.Color3(1, 0.89, 0.57);
     dlight1.intensity = 0.35;
 
-    mainScene.clearColor = new BABYLON.Color3(0.07, 0.07, 0.11, 0.9);
+    main3D.scene.clearColor = new BABYLON.Color3(0.07, 0.07, 0.11, 0.9);
     anim.transformZ = new BABYLON.TransformNode("root");
 
-    mainUI.highlightLayer = new BABYLON.HighlightLayer("hl1", mainScene);
+    mainUI.highlightLayer = new BABYLON.HighlightLayer("hl1", main3D.scene);
 
-    mainScene.registerBeforeRender(renderScene);
+    main3D.scene.registerBeforeRender(renderScene);
 }
 
 
 /**
-* Function: renderScene()
-* Render the scene
+* @description Render the scene
 */
 const renderScene = function () {
     if(mainUI.hover.light != null && mainUI.hover.light.isEnabled() != mainUI.isMeshHover) {
@@ -204,21 +222,19 @@ const renderScene = function () {
     }
 
     if(anim.playing){
-        anim.transformZ.position.z -= 0.1;
-        mainUI.playSlider.value = 0 - anim.transformZ.position.z;
-        updateAlphaTrans();
+        /* ANIMATION UPDATE */
+        anim.setTimePosition((anim.transformZ.position.z - 0.1) * -1)
     }
 }
 
 /**
-* Function: createScene()
-* Generate the scene for our data to be rendered
+* @description Generate the scene for our data to be rendered
 */
 const createScene = function () {
     //Initialize Meshes for selected layer
     createLayer(mainUI.layers.selected);
 
-    mainUI.hover.light = new BABYLON.PointLight("light", new BABYLON.Vector3(0, 0, 0), mainScene);
+    mainUI.hover.light = new BABYLON.PointLight("light", new BABYLON.Vector3(0, 0, 0), main3D.scene);
     mainUI.hover.light.diffuse = new BABYLON.Color3(1, 0.9, 0.65);
     mainUI.hover.light.specular = new BABYLON.Color3(1, 0.9, 0.65);
     mainUI.hover.light.range = 5;
@@ -248,7 +264,7 @@ const createScene = function () {
     updateAlphaTrans();
     initTimeGfx();
 
-    mainScene.onPointerMove = function (event, pickResult) {
+    main3D.scene.onPointerMove = function (event, pickResult) {
         if (mainUI.isMeshHover) {
             mainUI.hover.light.position = new BABYLON.Vector3(pickResult.pickedPoint.x, pickResult.pickedPoint.y+1, pickResult.pickedPoint.z);
             //Add the display price data on hover here
@@ -266,16 +282,21 @@ const createScene = function () {
         }
     }
 
-    mainScene.onPointerDown = (event, pickResult) => {
+    main3D.scene.onPointerDown = (event, pickResult) => {
         if(event.button == 0){
             if(mainUI.lineSelect >= 0) {
                 mainUI.highlightLayer.removeMesh(main3D.meshes[mainUI.layers.selected].buys[mainUI.lineSelect][1]);
                 mainUI.highlightLayer.removeMesh(main3D.meshes[mainUI.layers.selected].sells[mainUI.lineSelect][1]);
+                anim.snTimeSelect.setAttribute("x1", 0);
+                anim.snTimeSelect.setAttribute("x2", 0);
             }
 
             if(mainUI.isMeshHover) {
                 const line_num = Math.round((pickResult.pickedPoint.z - anim.transformZ.position.z - 10.0)/10.0);
-                const sel_snapshot = mapData.snapshots[main3D.meshes[mainUI.layers.selected].buys[line_num][1].metadata.id];
+                anim.snTimeSelect.setAttribute("x1", (line_num / mapData.snapsTotal) * anim.snTimeSvg.clientWidth);
+                anim.snTimeSelect.setAttribute("x2", (line_num / mapData.snapsTotal) * anim.snTimeSvg.clientWidth);
+                const sel_snap_num = main3D.meshes[mainUI.layers.selected].buys[line_num][1].metadata.id
+                const sel_snapshot = mapData.snapshots[sel_snap_num];
                 mainUI.highlightLayer.addMesh(main3D.meshes[mainUI.layers.selected].buys[line_num][1], BABYLON.Color3.Red());
                 mainUI.highlightLayer.addMesh(main3D.meshes[mainUI.layers.selected].sells[line_num][1], BABYLON.Color3.Red());
                 mainUI.lineSelect = line_num;
@@ -292,8 +313,7 @@ const createScene = function () {
 }
 
 /**
-* Function: createLayer(layer_index)
-* creates new geometry for a given layer
+* @description Creates new geometry for a given layer
 * @param {number} layer_index - index of layer to create
 */
 const createLayer = function(layer_index) {
@@ -329,8 +349,7 @@ const createLayer = function(layer_index) {
 }
 
 /**
-* Function: hideLayer(layer_index)
-* disables the existing geometry for this layer
+* @description disables the existing geometry for this layer
 * @param {number} layer_index - index of layer to create
 */
 const hideLayer = function(layer_index) {
@@ -351,8 +370,7 @@ const hideLayer = function(layer_index) {
 }
 
 /**
-* Function: showLayer(layer_index)
-* enables the existing geometry for this layer
+* @description enables the existing geometry for this layer
 * @param {number} layer_index - index of layer to create
 */
 const showLayer = function(layer_index) {
@@ -373,8 +391,7 @@ const showLayer = function(layer_index) {
 }
 
 /**
-* Function: generateMapRow(row_index, ind_buy)
-* create a new row for our price map
+* @description create a new row for our price map
 * @param {Snapshot} snapshot - snapshot object for row to create
 * @param {boolean} ind_buy - indicates whether this is a buy or sell row
 * @returns {object} - object containing the row mesh and line mesh
@@ -417,7 +434,7 @@ const generateMapRow = function(snapshot, ind_buy) {
         //sideOrientation: (ind_buy) ? BABYLON.Mesh.BACKSIDE : BABYLON.Mesh.FRONTSIDE
     });
 
-    let white_mat = new BABYLON.StandardMaterial("rowMat" + uniq_name, mainScene);
+    let white_mat = new BABYLON.StandardMaterial("rowMat" + uniq_name, main3D.scene);
     white_mat.wireframe = true;
     row.material = white_mat;
     row.renderingGroupId = 1;
@@ -427,7 +444,7 @@ const generateMapRow = function(snapshot, ind_buy) {
     mline1.color = new BABYLON.Color4(1, 1, 1, 0);
     mline1.metadata = {id: snapshot.id}
 
-    let mesh_action_manager = new BABYLON.ActionManager(mainScene);
+    let mesh_action_manager = new BABYLON.ActionManager(main3D.scene);
 
     // Cursor over mesh
     mesh_action_manager.registerAction(
@@ -465,8 +482,7 @@ const generateMapRow = function(snapshot, ind_buy) {
 }
 
 /**
-* Function:     getRowGeometry(orders, row_index, ind_bid)
-* Generates geometry data using the price data
+* @description Generates geometry data using the price data
 * @param {Orders[]} orders - array of orders*
 * @param {number} row_index - index of row to create
 * @param {boolean} ind_buy - indicates whether this is a buy or sell row
@@ -490,8 +506,7 @@ const getRowGeometry = function(orders, row_index, ind_buy){
 };
 
 /**
-* Function:     initFloor()
-* Generates geometry data for our 3D floor
+* @description Generates geometry data for our 3D floor
 */
 const initFloor = function(){
     // Get price scaling of floor lines
@@ -503,7 +518,6 @@ const initFloor = function(){
         fl_scale = Math.pow(10,  (maxstr.indexOf('.') > 0) ? maxstr.substring(0, maxstr.indexOf('.')).length - 1 : (maxstr.length - 1));
     }
     main3D.floor.count = 0;
-    main3D.x_price_scale = fl_scale;
 
     main3D.floor.createLine = (geometry) => {
         return BABYLON.MeshBuilder.CreateLines("floorLine" + (main3D.floor.count++), { points: geometry });
@@ -554,25 +568,24 @@ const initFloor = function(){
 };
 
 /**
-* Function:     setupAnimationEvents()
-* Setup UI for controlling animations
+* @description Setup UI for controlling animations
 */
 const setupAnimationEvents = function() {
+
+    // Time Slider Update Function
+    anim.setTimePosition = function(inputPos) {
+        if(inputPos > (0 - CENV.FRAME_RATE) && inputPos < ((mapData.snapsTotal * CENV.FRAME_RATE) - (CENV.DISPLAY_DEPTH * CENV.FRAME_RATE))) {
+            anim.transformZ.position.z = 0 - inputPos;
+            updateAlphaTrans();
+            updateTimeGfx();
+        }
+    };
 
     // Play Button setup
     mainUI.playButton = document.getElementById("anim-play");
     mainUI.playButton.onmousedown = function() {
         anim.playing = !anim.playing;
         mainUI.playButton.innerHtml = ((anim.playing) ? "Pause" : "Play" ) + " Animation"
-    };
-
-    // Animation slider changes
-    mainUI.playSlider = document.getElementById("anim-slider");
-    mainUI.playSlider.min = 0;
-    mainUI.playSlider.max = (mapData.snapsTotal) ? (mapData.snapsTotal * CENV.FRAME_RATE) : 1;
-    mainUI.playSlider.oninput = function() {
-        anim.transformZ.position.z = 0 - mainUI.playSlider.value;
-        updateAlphaTrans();
     };
 
     // Watch for browser/canvas resize events
@@ -587,18 +600,17 @@ const setupAnimationEvents = function() {
     };
     selectGeometryEvent();
 
-    mainScene.setRenderingAutoClearDepthStencil(1, false, false);
+    main3D.scene.setRenderingAutoClearDepthStencil(1, false, false);
 
     // Register a render loop to repeatedly render the scene
     main3D.engine.runRenderLoop(function () {
-            mainScene.render();
+            main3D.scene.render();
     });
 
 }
 
 /**
-* Function:     updateAlphaTrans()
-* updates the alpha transparency of meshes on render
+* @description updates the alpha transparency of meshes on render
 */
 const updateAlphaTrans = function() {
     main3D.meshes[mainUI.layers.selected].buys.forEach(setAlphaTrans);
@@ -607,7 +619,6 @@ const updateAlphaTrans = function() {
 }
 
 /**
-* Function:     setAlphaTrans(alpha_val, index)
 * sets the alpha transparency of meshes on render
 *  @param {mesh[]} alpha_val - object with alpha values, to set between 0 and 1
 *  @param {number} index - index of mesh to set
@@ -620,7 +631,6 @@ const setAlphaTrans = function(alpha_val, index) {
 };
 
 /**
-* Function:     getFrameAlpha(index)
 * gets the alpha value for a given frame based on index value
 *  @param {number} index - index of mesh to set
 */
@@ -640,8 +650,7 @@ const getFrameAlpha = function(index){
 };
 
 /**
-* Function:     selectGeometryEvent()
-* setup a geometry click event
+* @description setup a geometry click event
 */
 const selectGeometryEvent = function() {
     if (mainUI.layers.items) {
@@ -669,20 +678,20 @@ const selectGeometryEvent = function() {
                         createLayer(mainUI.layers.selected);
 
                     updateAlphaTrans();
+                    updateTimeGfx();
                 }
             };
         }
     }
     else {
-        console.log("setupAnimationEvents() :: failed to find options for geometry values");
+        console.log("Error failed to find options for geometry layer values");
         console.log(mainUI.dval);
     }
 }
 
 /**
-* Function:     setSelectedOrders(snapshot)
-* gets the alpha value for a given frame based on index value
-*  @param {snapshot} snapshot - the snapshot object with orders to display
+* @description gets the alpha value for a given frame based on index value
+* @param {snapshot} snapshot - the snapshot object with orders to display
 */
 const setSelectedOrders = function(snapshot){
     try{
@@ -737,8 +746,7 @@ const setSelectedOrders = function(snapshot){
 }
 
 /**
-* Function:     showOrdersTable()
-* shows the UI orders container
+* @description shows the UI orders container
 */
 const showOrdersTable = function() {
     if(!mainUI.orderDisplay){
@@ -749,8 +757,7 @@ const showOrdersTable = function() {
 }
 
 /**
-* Function:     hideOrdersTable()
-* hides the UI orders container
+* @description hides the UI orders container
 */
 const hideOrdersTable = function() {
     if(mainUI.orderDisplay){
@@ -761,9 +768,8 @@ const hideOrdersTable = function() {
 }
 
 /**
-* Function:     setSelectedCandle()
-* sets the data fields for the currently selected candle
-*  @param {snapshot} snapshot - the snapshot object with orders to display
+* @description sets the data fields for the currently selected candle
+* @param {snapshot} snapshot - the snapshot object with orders to display
 */
 const setSelectedCandle = function(snapshot){
     const candle = snapshot.candle;
@@ -788,8 +794,7 @@ const setSelectedCandle = function(snapshot){
 }
 
 /**
-* Function:     showCandlePanel()
-* shows the UI candle container
+* @description shows the UI candle container
 */
 const showCandlePanel = function() {
     if(!mainUI.candleDisplay){
@@ -800,8 +805,7 @@ const showCandlePanel = function() {
 }
 
 /**
-* Function:     hideCandlePanel()
-* hides the UI candle container
+* @description hides the UI candle container
 */
 const hideCandlePanel = function() {
     if(mainUI.candleDisplay){
@@ -812,8 +816,7 @@ const hideCandlePanel = function() {
 }
 
 /**
-* Function:     updateHoverPanel()
-* sets the data fields for the point currently being hovered
+* @description sets the data fields for the point currently being hovered
 *  @param {number} pX - the x coordinate of the pointer
 *  @param {number} pY - the y coordinate of the pointer
 *  @param {number} pZ - the z coordinate of the pointer
@@ -841,8 +844,7 @@ const updateHoverPanel = function(pX, pY, pZ){
 }
 
 /**
-* Function:     showHoverPanel()
-* shows the UI hover container
+* @description shows the UI hover container
 */
 const showHoverPanel = function() {
     if(!mainUI.hoverDisplay){
@@ -853,8 +855,7 @@ const showHoverPanel = function() {
 }
 
 /**
-* Function:     hideHoverPanel()
-* hides the UI hover container
+* @description hides the UI hover container
 */
 const hideHoverPanel = function() {
     if(mainUI.hoverDisplay){
@@ -865,13 +866,13 @@ const hideHoverPanel = function() {
 }
 
 /**
-* Function:     initTimeGfx()
-* setup for timeline graphics SVG
+* @description setup for timeline graphics SVG
 */
 const initTimeGfx = function () {
     const svgns = 'http://www.w3.org/2000/svg';
     const svgCont = document.getElementById('sn-time-gfx');
-    let initPath = document.createElementNS(svgns,"path");
+    anim.snTimeSvg = svgCont;
+    const initPath = document.createElementNS(svgns,"path");
     const snapKeys = Object.keys(mapData.snapshots).sort();
     const wSvg = svgCont.clientWidth;
     const hSvg = svgCont.clientHeight;
@@ -902,29 +903,112 @@ const initTimeGfx = function () {
         dPath += " L " + (wSvg * ((index + 1)/snapKeys.length)) + " " + (hSvg - (((snap.candle.close - minSny)/vSny)  * hSvg));
     });
 
-    initPath.setAttributeNS(null, "d", dPath);
-    initPath.setAttributeNS(null, "stroke", "#74ff00");
-    initPath.setAttributeNS(null, "stroke-width", "2");
-    initPath.setAttributeNS(null, "fill", "transparent");
-    svgCont.replaceChildren(initPath);
+    initPath.setAttribute("d", dPath);
+    initPath.setAttribute("stroke", "#74ff00");
+    initPath.setAttribute("stroke-width", "2");
+    initPath.setAttribute("fill", "transparent");
     
-    //Change the below to create a rectangle shape and assign it the following property: fill="url(#sn-time-gfx-lg)"
-    const lgrad = document.createElementNS(svgns, "linearGradient");
-    lgrad.setAttribute("id", "sn-time-gfx-lg");
-    lgrad.setAttribute("x1", "0%");
-    lgrad.setAttribute("x2", "100%");
-    lgrad.setAttribute("y1", "0%");
-    lgrad.setAttribute("y2", "0%");
-    svgCont.appendChild(lgrad);
+    const selectLine  = document.createElementNS(svgns,"line");
+    selectLine.setAttribute("id", "sn-time-sel-line");
+    selectLine.setAttribute("x1", -1);
+    selectLine.setAttribute("y1", 0);
+    selectLine.setAttribute("x2", -1);
+    selectLine.setAttribute("y2", hSvg);
+    anim.snTimeSelect = selectLine;
 
-    const stopData = [[1,"0"], [1,".10"], [0,".15"], [0,".20"], [1,".25"], [1,"1.0"]];
-    stopData.forEach((val, index) => {
-        let stop = document.createElementNS(svgns, "stop");
-        stop.setAttribute("id", "sn-time-gfx-stop"+index);
-        stop.setAttribute("offset", val[1]);
-        stop.setAttribute("stop-color", "#3a464a")
-        stop.setAttribute("stop-opacity", (val[0] ? "100%" : "0%"));
-        lgrad.appendChild(stop);
-    })
+    // Timeline Visual Indicator
+    const sW = wSvg / mapData.snapsTotal;
+    const gapW = sW * CENV.DISPLAY_DEPTH;
+    const lrct = document.createElementNS(svgns, "rect");
+    lrct.setAttribute("id", "sn-time-l-rect");
+    lrct.setAttribute("width", (wSvg + sW));
+    lrct.setAttribute("height", "110%");
+    lrct.setAttribute("x", (wSvg + sW) * -1);
+    anim.snTimeLeft = lrct;
+
+    const rrct = document.createElementNS(svgns, "rect");
+    rrct.setAttribute("id", "sn-time-r-rect");
+    rrct.setAttribute("width", (wSvg + sW));
+    rrct.setAttribute("height", "110%");
+    rrct.setAttribute("x", gapW);
+    anim.snTimeRight = rrct;
     
+    // Left Linear Gradient
+    const lgrad = document.createElementNS(svgns, "linearGradient");
+    lgrad.setAttribute("id", "sn-time-lg-left");
+    lgrad.setAttribute("x1", "0%");
+    lgrad.setAttribute("y1", "0%");
+    lgrad.setAttribute("x2", "100%");
+    lgrad.setAttribute("y2", "0%");
+
+    const stopDataLeft = [[1,"0"], [1,".90"], [0,"1.0"]];
+    stopDataLeft.forEach((val, index) => {
+        let stop = document.createElementNS(svgns, "stop");
+        stop.setAttribute("id", "sn-time-lg-ls"+index);
+        stop.setAttribute("offset", val[1]);
+        stop.setAttribute("stop-color", "#3a464a");
+        stop.setAttribute("stop-opacity", (val[0] ? "25%" : "0%"));
+        lgrad.appendChild(stop);
+    });
+
+    lrct.setAttribute("fill", "url(#sn-time-lg-left)");
+
+    // Right Linear Gradient
+    const rgrad = document.createElementNS(svgns, "linearGradient");
+    rgrad.setAttribute("id", "sn-time-lg-right");
+    rgrad.setAttribute("x1", "0%");
+    rgrad.setAttribute("y1", "0%");
+    rgrad.setAttribute("x2", "100%");
+    rgrad.setAttribute("y2", "0%");
+
+    const stopDataRight = [[0,"0"], [1,".10"], [1,"1.0"]];
+    stopDataRight.forEach((val, index) => {
+        let stop = document.createElementNS(svgns, "stop");
+        stop.setAttribute("id", "sn-time-lg-rs"+index);
+        stop.setAttribute("offset", val[1]);
+        stop.setAttribute("stop-color", "#3a464a");
+        stop.setAttribute("stop-opacity", (val[0] ? "25%" : "0%"));
+        rgrad.appendChild(stop);
+    });
+
+    rrct.setAttribute("fill", "url(#sn-time-lg-right)");
+
+    // Add All to SVG (determines display ordering)
+    svgCont.replaceChildren(lrct);
+    svgCont.appendChild(lrct);
+    svgCont.appendChild(rrct);
+    svgCont.appendChild(lgrad);
+    svgCont.appendChild(rgrad);
+    svgCont.appendChild(initPath);
+    svgCont.appendChild(selectLine);
+
+    // Add Event Listeners
+    svgCont.addEventListener('mousedown', (event) => {
+        anim.snTimeDragging = true;
+        const txOffset = event.offsetX - ((anim.snTimeSvg.clientWidth / mapData.snapsTotal) * CENV.DISPLAY_DEPTH / 2);
+        anim.setTimePosition((txOffset / anim.snTimeSvg.clientWidth) * (mapData.snapsTotal * CENV.FRAME_RATE))
+    });
+
+    svgCont.addEventListener('mousemove', (event) => {
+        if (anim.snTimeDragging)  {
+            const txOffset = event.offsetX - ((anim.snTimeSvg.clientWidth / mapData.snapsTotal) * CENV.DISPLAY_DEPTH / 2);
+            anim.setTimePosition((txOffset / anim.snTimeSvg.clientWidth) * (mapData.snapsTotal * CENV.FRAME_RATE))
+        }
+    });
+    document.addEventListener('mouseup', (event) => {
+        anim.snTimeDragging = false;
+    });
+}
+
+/**
+* @description Update function to keep slider/indicator in sync with current timeline position
+*/
+const updateTimeGfx = function(){
+    const wSvg = anim.snTimeSvg.clientWidth;
+    const sW = wSvg / mapData.snapsTotal;
+    const timeOffset = wSvg * (anim.transformZ.position.z / (mapData.snapsTotal * CENV.FRAME_RATE))
+    const leftStartPos = (wSvg + sW) * -1;
+    anim.snTimeLeft.setAttribute("x", leftStartPos - timeOffset)
+    const rightStartPos = sW * CENV.DISPLAY_DEPTH;
+    anim.snTimeRight.setAttribute("x", rightStartPos - timeOffset)
 }

@@ -3,3 +3,4 @@ node_modules
 docker-compose.yaml
 .gitignore
 Dockerfile
+slider_dimensions1.png

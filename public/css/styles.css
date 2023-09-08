@@ -255,16 +255,17 @@ div.bc-dval-opt-sel {
     background-color: #12121c;
     border: 1px solid #3a464a;
 }
+
 #sn-time-gfx {
     width:100%;
-}
-.sn-time-s1 {
-    stop-color: #3a464a;
-    stop-opacity: 0%;
-}
-.sn-time-s2 {
-    stop-color: #3a464a;
-    stop-opacity: 100%;
+    margin-bottom: -3px;
 }
 
+#sn-time-sel-line {
+    stroke:#860000;
+    stroke:#0d1011;
+    stroke-width: 2px;
+    stroke-opacity: 80%;
+    stroke-dasharray: 5 3;
+}
 
