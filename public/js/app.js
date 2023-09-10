@@ -1,16 +1,5 @@
-
-/**
- * Environment Variables
- * @type {{ FRAME_RATE: number; MAP_RESOLUTION: number; DISPLAY_DEPTH: number; MESH_ALPHA: number; LINE_ALPHA: number; TIME_GRANULARITY: number; }}
- */
-const CENV = {
-    FRAME_RATE: 10,
-    MAP_RESOLUTION: 100,
-    DISPLAY_DEPTH: 10,
-    MESH_ALPHA: 0.3,
-    LINE_ALPHA: 0.7,
-    TIME_GRANULARITY: 300,
-};
+import { CENV } from './cenv.js';
+import { snTime } from './snTime.js';
 
 /**
  * Global UI Elements
@@ -68,12 +57,6 @@ var main3D = {
 var anim = {
     playing: false,
     transformZ: null,
-    snTimeLeft: null,
-    snTimeRight: null,
-    snTimeSvg: null,
-    snTimeDragging: false,
-    snTimeSelect: false,
-    setTimePosition: (inputPos) => { return null },
 };
 
 /**
@@ -91,7 +74,7 @@ var mapData = {
 /**
 * @description Retrieve order book snapshot data from server for buys and sells
 */
-const prepareData = async () => {
+var prepareData = async () => {
     console.log("Preparing Data");
     try {
         //Latest Snapshot
@@ -165,11 +148,11 @@ const prepareData = async () => {
 
 
 /**
-* @description Generate the scene for our data to be rendered
+* @description Pre-data import, scene generation
 * @param {BABYLON.Engine} main_engine - the main babylon engine
 * @param {HTMLCanvasElement} main_canvas - the canvas element
 */
-const initScene = function (main_engine, main_canvas) {
+var initScene = function (main_engine, main_canvas) {
     console.log("Initializing Scene");
     main3D.engine = main_engine;
     main3D.scene = new BABYLON.Scene(main3D.engine);
@@ -223,12 +206,12 @@ const renderScene = function () {
 
     if(anim.playing){
         /* ANIMATION UPDATE */
-        anim.setTimePosition((anim.transformZ.position.z - 0.1) * -1)
+        setTimePosition((anim.transformZ.position.z - 0.1) * -1);
     }
 }
 
 /**
-* @description Generate the scene for our data to be rendered
+* @description Post-data import, scene generation
 */
 const createScene = function () {
     //Initialize Meshes for selected layer
@@ -262,7 +245,7 @@ const createScene = function () {
     
     initFloor();
     updateAlphaTrans();
-    initTimeGfx();
+    snTime.initTimeGfx(mapData.snapshots);
 
     main3D.scene.onPointerMove = function (event, pickResult) {
         if (mainUI.isMeshHover) {
@@ -287,27 +270,24 @@ const createScene = function () {
             if(mainUI.lineSelect >= 0) {
                 mainUI.highlightLayer.removeMesh(main3D.meshes[mainUI.layers.selected].buys[mainUI.lineSelect][1]);
                 mainUI.highlightLayer.removeMesh(main3D.meshes[mainUI.layers.selected].sells[mainUI.lineSelect][1]);
-                anim.snTimeSelect.setAttribute("x1", 0);
-                anim.snTimeSelect.setAttribute("x2", 0);
+                snTime.setSelectedLine(-1, mapData.snapsTotal);
+                hideOrdersTable();
+                hideCandlePanel();
             }
 
             if(mainUI.isMeshHover) {
                 const line_num = Math.round((pickResult.pickedPoint.z - anim.transformZ.position.z - 10.0)/10.0);
-                anim.snTimeSelect.setAttribute("x1", (line_num / mapData.snapsTotal) * anim.snTimeSvg.clientWidth);
-                anim.snTimeSelect.setAttribute("x2", (line_num / mapData.snapsTotal) * anim.snTimeSvg.clientWidth);
+                mainUI.lineSelect = line_num;
+                snTime.setSelectedLine(lineNum, mapData.snapsTotal);
                 const sel_snap_num = main3D.meshes[mainUI.layers.selected].buys[line_num][1].metadata.id
                 const sel_snapshot = mapData.snapshots[sel_snap_num];
                 mainUI.highlightLayer.addMesh(main3D.meshes[mainUI.layers.selected].buys[line_num][1], BABYLON.Color3.Red());
                 mainUI.highlightLayer.addMesh(main3D.meshes[mainUI.layers.selected].sells[line_num][1], BABYLON.Color3.Red());
-                mainUI.lineSelect = line_num;
                 showOrdersTable();
                 showCandlePanel();
                 setSelectedOrders(sel_snapshot);
                 setSelectedCandle(sel_snapshot);
-            } else {
-                hideOrdersTable();
-                hideCandlePanel();
-            }
+            } 
         }
     };
 }
@@ -325,6 +305,7 @@ const createLayer = function(layer_index) {
     main3D.meshes[layer_index].sells = [];
 
     for(const snap_id in mapData.snapshots){
+        //TODO: remove last snapshot from generating a new geometry/row
         //Do not generate a new mesh if we have no order history (just a candlestick)
         if(!mapData.snapshots[snap_id].orders) return;
 
@@ -570,16 +551,7 @@ const initFloor = function(){
 /**
 * @description Setup UI for controlling animations
 */
-const setupAnimationEvents = function() {
-
-    // Time Slider Update Function
-    anim.setTimePosition = function(inputPos) {
-        if(inputPos > (0 - CENV.FRAME_RATE) && inputPos < ((mapData.snapsTotal * CENV.FRAME_RATE) - (CENV.DISPLAY_DEPTH * CENV.FRAME_RATE))) {
-            anim.transformZ.position.z = 0 - inputPos;
-            updateAlphaTrans();
-            updateTimeGfx();
-        }
-    };
+var setupAnimationEvents = function() {
 
     // Play Button setup
     mainUI.playButton = document.getElementById("anim-play");
@@ -607,6 +579,25 @@ const setupAnimationEvents = function() {
             main3D.scene.render();
     });
 
+    // snTime - animation control events
+    const snSvgCont = document.getElementById('sn-time-gfx');
+    snSvgCont.addEventListener('mousedown', (event) => {
+        snTime.isDragging = true;
+        const txOffset = event.offsetX - ((snTime.gfxSvg.clientWidth / mapData.snapsTotal) * CENV.DISPLAY_DEPTH / 2);
+        const inputPos = (txOffset / snTime.gfxSvg.clientWidth) * (mapData.snapsTotal * CENV.FRAME_RATE);
+        setTimePosition(inputPos);
+    });
+
+    snSvgCont.addEventListener('mousemove', (event) => {
+        const txOffset = event.offsetX - ((snTime.gfxSvg.clientWidth / mapData.snapsTotal) * CENV.DISPLAY_DEPTH / 2);
+        const inputPos = (txOffset / snTime.gfxSvg.clientWidth) * (mapData.snapsTotal * CENV.FRAME_RATE);
+        if (snTime.isDragging) { 
+            setTimePosition(inputPos);
+        }
+    });
+    document.addEventListener('mouseup', (event) => {
+        snTime.isDragging = false;
+    });
 }
 
 /**
@@ -631,7 +622,7 @@ const setAlphaTrans = function(alpha_val, index) {
 };
 
 /**
-* gets the alpha value for a given frame based on index value
+* @description gets the alpha value for a given frame based on index value
 *  @param {number} index - index of mesh to set
 */
 const getFrameAlpha = function(index){
@@ -865,150 +856,12 @@ const hideHoverPanel = function() {
     }
 }
 
-/**
-* @description setup for timeline graphics SVG
-*/
-const initTimeGfx = function () {
-    const svgns = 'http://www.w3.org/2000/svg';
-    const svgCont = document.getElementById('sn-time-gfx');
-    anim.snTimeSvg = svgCont;
-    const initPath = document.createElementNS(svgns,"path");
-    const snapKeys = Object.keys(mapData.snapshots).sort();
-    const wSvg = svgCont.clientWidth;
-    const hSvg = svgCont.clientHeight;
-
-    let maxSny = 0;
-    let minSny = 0;
-    snapKeys.forEach((key, index) => {
-        const snap = mapData.snapshots[key];
-        if(index == 0) {
-            maxSny = snap.candle.open;
-            minSny = snap.candle.open;
-        }
-        if (maxSny < snap.candle.close) {
-            maxSny = snap.candle.close;
-        }
-        if (minSny > snap.candle.close) {
-            minSny = snap.candle.close;
-        }
-    });
-
-    const vSny = maxSny - minSny;
-    let dPath = "";
-    snapKeys.forEach((key, index) => {
-        const snap = mapData.snapshots[key];
-        if(index == 0){
-            dPath += "M 0 " + (hSvg - (((snap.candle.open - minSny)/vSny) * (100.0/hSvg)));
-        }
-        dPath += " L " + (wSvg * ((index + 1)/snapKeys.length)) + " " + (hSvg - (((snap.candle.close - minSny)/vSny)  * hSvg));
-    });
-
-    initPath.setAttribute("d", dPath);
-    initPath.setAttribute("stroke", "#74ff00");
-    initPath.setAttribute("stroke-width", "2");
-    initPath.setAttribute("fill", "transparent");
-    
-    const selectLine  = document.createElementNS(svgns,"line");
-    selectLine.setAttribute("id", "sn-time-sel-line");
-    selectLine.setAttribute("x1", -1);
-    selectLine.setAttribute("y1", 0);
-    selectLine.setAttribute("x2", -1);
-    selectLine.setAttribute("y2", hSvg);
-    anim.snTimeSelect = selectLine;
-
-    // Timeline Visual Indicator
-    const sW = wSvg / mapData.snapsTotal;
-    const gapW = sW * CENV.DISPLAY_DEPTH;
-    const lrct = document.createElementNS(svgns, "rect");
-    lrct.setAttribute("id", "sn-time-l-rect");
-    lrct.setAttribute("width", (wSvg + sW));
-    lrct.setAttribute("height", "110%");
-    lrct.setAttribute("x", (wSvg + sW) * -1);
-    anim.snTimeLeft = lrct;
-
-    const rrct = document.createElementNS(svgns, "rect");
-    rrct.setAttribute("id", "sn-time-r-rect");
-    rrct.setAttribute("width", (wSvg + sW));
-    rrct.setAttribute("height", "110%");
-    rrct.setAttribute("x", gapW);
-    anim.snTimeRight = rrct;
-    
-    // Left Linear Gradient
-    const lgrad = document.createElementNS(svgns, "linearGradient");
-    lgrad.setAttribute("id", "sn-time-lg-left");
-    lgrad.setAttribute("x1", "0%");
-    lgrad.setAttribute("y1", "0%");
-    lgrad.setAttribute("x2", "100%");
-    lgrad.setAttribute("y2", "0%");
-
-    const stopDataLeft = [[1,"0"], [1,".90"], [0,"1.0"]];
-    stopDataLeft.forEach((val, index) => {
-        let stop = document.createElementNS(svgns, "stop");
-        stop.setAttribute("id", "sn-time-lg-ls"+index);
-        stop.setAttribute("offset", val[1]);
-        stop.setAttribute("stop-color", "#3a464a");
-        stop.setAttribute("stop-opacity", (val[0] ? "25%" : "0%"));
-        lgrad.appendChild(stop);
-    });
-
-    lrct.setAttribute("fill", "url(#sn-time-lg-left)");
-
-    // Right Linear Gradient
-    const rgrad = document.createElementNS(svgns, "linearGradient");
-    rgrad.setAttribute("id", "sn-time-lg-right");
-    rgrad.setAttribute("x1", "0%");
-    rgrad.setAttribute("y1", "0%");
-    rgrad.setAttribute("x2", "100%");
-    rgrad.setAttribute("y2", "0%");
-
-    const stopDataRight = [[0,"0"], [1,".10"], [1,"1.0"]];
-    stopDataRight.forEach((val, index) => {
-        let stop = document.createElementNS(svgns, "stop");
-        stop.setAttribute("id", "sn-time-lg-rs"+index);
-        stop.setAttribute("offset", val[1]);
-        stop.setAttribute("stop-color", "#3a464a");
-        stop.setAttribute("stop-opacity", (val[0] ? "25%" : "0%"));
-        rgrad.appendChild(stop);
-    });
-
-    rrct.setAttribute("fill", "url(#sn-time-lg-right)");
-
-    // Add All to SVG (determines display ordering)
-    svgCont.replaceChildren(lrct);
-    svgCont.appendChild(lrct);
-    svgCont.appendChild(rrct);
-    svgCont.appendChild(lgrad);
-    svgCont.appendChild(rgrad);
-    svgCont.appendChild(initPath);
-    svgCont.appendChild(selectLine);
-
-    // Add Event Listeners
-    svgCont.addEventListener('mousedown', (event) => {
-        anim.snTimeDragging = true;
-        const txOffset = event.offsetX - ((anim.snTimeSvg.clientWidth / mapData.snapsTotal) * CENV.DISPLAY_DEPTH / 2);
-        anim.setTimePosition((txOffset / anim.snTimeSvg.clientWidth) * (mapData.snapsTotal * CENV.FRAME_RATE))
-    });
-
-    svgCont.addEventListener('mousemove', (event) => {
-        if (anim.snTimeDragging)  {
-            const txOffset = event.offsetX - ((anim.snTimeSvg.clientWidth / mapData.snapsTotal) * CENV.DISPLAY_DEPTH / 2);
-            anim.setTimePosition((txOffset / anim.snTimeSvg.clientWidth) * (mapData.snapsTotal * CENV.FRAME_RATE))
-        }
-    });
-    document.addEventListener('mouseup', (event) => {
-        anim.snTimeDragging = false;
-    });
+const setTimePosition = function(inputPos) {
+    if(inputPos > (0 - CENV.FRAME_RATE) && inputPos < ((mapData.snapsTotal * CENV.FRAME_RATE) - (CENV.DISPLAY_DEPTH * CENV.FRAME_RATE))) {
+        anim.transformZ.position.z = 0 - inputPos;
+        updateAlphaTrans();
+        snTime.updateTimeGfx(anim.transformZ.position.z, mapData.snapsTotal);
+    }
 }
 
-/**
-* @description Update function to keep slider/indicator in sync with current timeline position
-*/
-const updateTimeGfx = function(){
-    const wSvg = anim.snTimeSvg.clientWidth;
-    const sW = wSvg / mapData.snapsTotal;
-    const timeOffset = wSvg * (anim.transformZ.position.z / (mapData.snapsTotal * CENV.FRAME_RATE))
-    const leftStartPos = (wSvg + sW) * -1;
-    anim.snTimeLeft.setAttribute("x", leftStartPos - timeOffset)
-    const rightStartPos = sW * CENV.DISPLAY_DEPTH;
-    anim.snTimeRight.setAttribute("x", rightStartPos - timeOffset)
-}
+export { initScene, prepareData, setupAnimationEvents }

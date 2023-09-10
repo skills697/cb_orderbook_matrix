@@ -9,7 +9,6 @@
   <script src="https://cdn.babylonjs.com/loaders/babylonjs.loaders.min.js"></script>
   <script src="https://cdn.babylonjs.com/gui/babylon.gui.js"></script>
   <script src="https://code.jquery.com/pep/0.4.3/pep.js"></script>
-  <script src="/js/app.js"></script>
 </head>
 <body>
     <div id="bd-top-menu">
@@ -29,7 +28,8 @@
     </div>
     <div id="bd-main" class="bc-content">
         <canvas id="renderCanvas" touch-action="none"></canvas>
-	    <script>
+	    <script type="module">
+            import { initScene, prepareData, setupAnimationEvents }  from './js/app.js'
             const canvas = document.getElementById("renderCanvas"); // Get the canvas element
             const engine = new BABYLON.Engine(canvas, true); // Generate the BABYLON 3D engine
 
